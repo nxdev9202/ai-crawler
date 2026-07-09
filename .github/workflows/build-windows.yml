@@ -43,8 +43,12 @@ jobs:
           }
 
       # 2) Electron 앱 + MSI 생성 (electron-builder가 백엔드 exe를 동봉)
+      #    코드서명: WIN_CSC_LINK(pfx base64) / WIN_CSC_KEY_PASSWORD 시크릿이 있으면 자동 서명
       - name: Build Electron MSI
         working-directory: electron
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: |
           npm install
           npm run dist
