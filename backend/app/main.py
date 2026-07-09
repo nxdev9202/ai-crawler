@@ -48,6 +48,8 @@ class AccountsReq(BaseModel):
     coupang_pw: Optional[str] = None
     gemini_api_key: Optional[str] = None
     gemini_model: Optional[str] = None
+    use_real_chrome: Optional[str] = None
+    chrome_profile: Optional[str] = None
 
 
 @app.on_event("startup")
