@@ -31,7 +31,7 @@ def get_accounts() -> dict[str, str]:
         "coupang_email": settings.coupang_email or "",
         "coupang_pw": settings.coupang_pw or "",
         "gemini_api_key": settings.google_api_key or "",
-        "gemini_model": settings.gemini_model or "gemini-2.0-flash",
+        "gemini_model": settings.gemini_model or "gemini-3.5-flash",
     }
     if ACCOUNTS_FILE.exists():
         try:
@@ -74,7 +74,7 @@ def masked_status() -> dict[str, Any]:
         "coupang_set": bool(acc["coupang_email"] and acc["coupang_pw"]),
         "gemini_set": bool(key),
         "gemini_key_hint": ("…" + key[-4:]) if key else "",
-        "gemini_model": acc.get("gemini_model") or "gemini-2.0-flash",
+        "gemini_model": acc.get("gemini_model") or "gemini-3.5-flash",
     }
 
 
@@ -83,5 +83,5 @@ def get_gemini_config() -> dict[str, str]:
     acc = get_accounts()
     return {
         "api_key": acc.get("gemini_api_key") or "",
-        "model": acc.get("gemini_model") or "gemini-2.0-flash",
+        "model": acc.get("gemini_model") or "gemini-3.5-flash",
     }

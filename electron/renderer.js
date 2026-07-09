@@ -278,7 +278,16 @@ async function openAccounts() {
     const a = await window.api.getAccounts();
     $("acc_naver_id").value = a.naver_id || "";
     $("acc_coupang_email").value = a.coupang_email || "";
-    $("acc_gemini_model").value = a.gemini_model || "";
+    // 드롭다운: 저장된 모델이 목록에 없으면 옵션으로 추가 후 선택
+    const sel = $("acc_gemini_model");
+    const m = a.gemini_model || "gemini-3.5-flash";
+    if (m && ![...sel.options].some((o) => o.value === m)) {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = m + " (현재)";
+      sel.insertBefore(opt, sel.firstChild);
+    }
+    sel.value = m;
     setLoginDot("Naver", a.naver_set ? null : false, a.naver_set ? "계정 설정됨" : "계정 없음");
     setLoginDot("Coupang", a.coupang_set ? null : false, a.coupang_set ? "계정 설정됨" : "계정 없음");
     setLoginDot("Gemini", a.gemini_set ? true : false, a.gemini_set ? "키 설정됨 " + (a.gemini_key_hint || "") : "키 없음");

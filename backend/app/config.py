@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     database_url: str = ""
 
     google_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.5-flash"
 
     crawl_max_products: int = 10
     # 상품당 수집할 리뷰 최대 개수(pageSize 20씩 페이지네이션)
