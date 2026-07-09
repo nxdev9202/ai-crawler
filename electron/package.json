@@ -1,9 +1,9 @@
 {
-  "name": "ai-analysis-crawler",
+  "name": "nxai-crawler",
   "version": "1.0.0",
   "description": "네이버쇼핑/쿠팡 상세페이지 크롤링 + Gemini 분석 데스크톱 앱",
   "main": "main.js",
-  "author": "",
+  "author": "NX",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -15,10 +15,11 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "com.company.aicrawler",
-    "productName": "AI분석크롤러",
+    "appId": "com.nx.aicrawler",
+    "productName": "NXaiCrawler",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "main.js",
@@ -33,10 +34,11 @@
       }
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "msi"
       ],
-      "artifactName": "AI분석크롤러-Setup-${version}.${ext}"
+      "artifactName": "NXaiCrawler-Setup-${version}.${ext}"
     },
     "msi": {
       "oneClick": false,
