@@ -1,7 +1,10 @@
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, shell, dialog } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
+
+// 자동 업데이트용 읽기전용 토큰(CI 빌드 시 시크릿으로 치환됨). dev/미치환이면 비활성.
+const UPDATE_TOKEN = "__UPDATE_TOKEN__";
 
 const BACKEND_HOST = "127.0.0.1";
 const BACKEND_PORT = 8756;
@@ -79,10 +82,52 @@ function createWindow() {
   });
 }
 
+// 자동 업데이트: GitHub Releases(private)에서 최신 버전 확인 → 백그라운드 다운로드 → 종료 시 설치
+function setupAutoUpdate() {
+  if (!app.isPackaged) return; // 개발 중엔 비활성
+  if (!UPDATE_TOKEN || UPDATE_TOKEN.includes("UPDATE_TOKEN")) {
+    console.log("[update] 토큰 미설정 - 자동 업데이트 비활성");
+    return;
+  }
+  let autoUpdater;
+  try {
+    ({ autoUpdater } = require("electron-updater"));
+  } catch (e) {
+    console.error("[update] electron-updater 로드 실패:", e.message);
+    return;
+  }
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.setFeedURL({
+    provider: "github",
+    owner: "nxdev9202",
+    repo: "ai-crawler",
+    private: true,
+    token: UPDATE_TOKEN,
+  });
+  autoUpdater.on("error", (err) => console.error("[update] error:", err?.message));
+  autoUpdater.on("update-available", (info) => console.log("[update] 새 버전:", info.version));
+  autoUpdater.on("update-downloaded", async (info) => {
+    const res = await dialog.showMessageBox({
+      type: "info",
+      buttons: ["지금 재시작", "나중에"],
+      defaultId: 0,
+      title: "업데이트 준비됨",
+      message: `새 버전 ${info.version} 이(가) 준비되었습니다.`,
+      detail: "지금 재시작하면 업데이트가 적용됩니다. (나중에 선택 시 다음 종료 때 자동 적용)",
+    });
+    if (res.response === 0) autoUpdater.quitAndInstall();
+  });
+  // 실행 직후 + 이후 6시간마다 확인
+  autoUpdater.checkForUpdates().catch(() => {});
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
+}
+
 app.whenReady().then(() => {
   startBackend();
   // 창을 즉시 띄운다. 백엔드 연결은 렌더러가 폴링하며 로딩 화면을 보여준다.
   createWindow();
+  setupAutoUpdate();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -7,8 +7,11 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win msi",
-    "dist:nsis": "electron-builder --win nsis"
+    "dist": "electron-builder --win nsis --publish never",
+    "publish": "electron-builder --win nsis --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "electron": "^33.2.1",
@@ -33,16 +36,26 @@
         "to": "backend"
       }
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "nxdev9202",
+      "repo": "ai-crawler",
+      "private": true,
+      "releaseType": "release"
+    },
     "win": {
       "icon": "build/icon.ico",
       "target": [
-        "msi"
+        "nsis"
       ],
       "artifactName": "NXaiCrawler-Setup-${version}.${ext}"
     },
-    "msi": {
+    "nsis": {
       "oneClick": false,
-      "perMachine": false
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     }
   }
 }

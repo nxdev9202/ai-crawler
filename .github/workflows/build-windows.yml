@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write   # GitHub Releases 발행에 필요
 
     steps:
       - name: Checkout
@@ -42,21 +44,27 @@ jobs:
             Write-Error "백엔드 exe 번들 실패"; exit 1
           }
 
-      # 2) Electron 앱 + MSI 생성 (electron-builder가 백엔드 exe를 동봉)
-      #    코드서명: WIN_CSC_LINK(pfx base64) / WIN_CSC_KEY_PASSWORD 시크릿이 있으면 자동 서명
-      - name: Build Electron MSI
+      # 2) Electron 앱(NSIS) 생성 + GitHub Releases 발행 + 코드서명 + 자동업데이트 토큰 주입
+      - name: Build & publish (NSIS)
         working-directory: electron
+        shell: pwsh
         env:
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}        # electron-builder 릴리스 발행용
+          UPDATE_TOKEN: ${{ secrets.UPDATE_TOKEN }}    # 앱 내장 읽기전용 토큰(자동업데이트 다운로드용)
         run: |
           npm install
-          npm run dist
+          # 버전 자동 증가(1.0.<run_number>) → 클라이언트가 업데이트 감지
+          npm version 1.0.${{ github.run_number }} --no-git-tag-version --allow-same-version
+          # main.js의 플레이스홀더에 읽기전용 토큰 주입(소스에는 저장 안 됨)
+          (Get-Content main.js) -replace '__UPDATE_TOKEN__', $env:UPDATE_TOKEN | Set-Content main.js
+          npm run publish
 
-      # 3) MSI 산출물 업로드 (Actions 실행 페이지에서 다운로드)
-      - name: Upload MSI
+      # 3) 설치본 산출물 업로드(Actions에서도 다운로드 가능)
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: AI분석크롤러-MSI
-          path: electron/release/*.msi
+          name: NXaiCrawler-Installer
+          path: electron/release/*.exe
           if-no-files-found: error
