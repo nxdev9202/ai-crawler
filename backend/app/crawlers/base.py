@@ -108,7 +108,11 @@ async def browser_context(session_id: str | None = None):
     from ..paths import real_chrome_user_data
 
     acc = get_accounts()
-    use_real = acc.get("use_real_chrome") == "1"
+    # 실제 크롬 프로필 방식은 영구 비활성화한다.
+    # 크롬은 자동화(--no-sandbox 등)로 로그인된 프로필을 열면 "본인 인증"을 요구하며
+    # 프로필을 잠그고(디버깅 포트 미개방 → launch hang), 닫을 때 구글 계정을 로그아웃시킨다.
+    # 이는 우회 불가한 크롬 보안 기능이므로 항상 전용 프로필(.userdata)만 사용한다.
+    use_real = False
     extra_args = ["--disable-blink-features=AutomationControlled"]
     inject_cookies = settings.crawl_use_chrome_cookies
 

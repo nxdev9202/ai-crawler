@@ -393,16 +393,17 @@
         </div>
         <p class="modal__desc">기업용: 개인 계정 대신 <b>전용 계정</b>을 사용하세요. 크롤링 시작 시 로그인 상태를 확인하고, 미로그인이면 이 계정으로 로그인합니다.</p>
 
-        <div class="acct-group">
+        <div class="acct-group" style="opacity:.55">
           <div class="acct-group__top">
-            <span class="chip" style="background:#f5b656;color:#04120a">크롬</span>
-            <span class="login-txt" style="margin-left:0">내 크롬 프로필로 크롤링</span>
-            <label class="switch"><input type="checkbox" id="acc_use_real_chrome" /><span class="switch__sl"></span></label>
+            <span class="chip" style="background:#6b7280;color:#fff">크롬</span>
+            <span class="login-txt" style="margin-left:0">내 크롬 프로필로 크롤링 (사용 불가)</span>
+            <label class="switch"><input type="checkbox" id="acc_use_real_chrome" disabled /><span class="switch__sl"></span></label>
           </div>
-          <select id="acc_chrome_profile"></select>
+          <select id="acc_chrome_profile" style="display:none"></select>
           <div class="acct-hint">
-            켜면 <b>평소 쓰는 크롬 프로필</b>(쿠팡·네이버 이미 로그인된 상태)로 크롤링해서 봇차단·로그인 문제가 해결됩니다.<br />
-            <b>단, 크롤링 중엔 그 크롬을 완전히 종료</b>해야 합니다(프로필 잠금).
+            크롬은 자동화로 <b>로그인된 프로필</b>을 열면 "본인 인증"을 요구하며 프로필을 잠그고,
+            닫을 때 <b>구글 계정을 로그아웃</b>시킵니다(우회 불가한 크롬 보안). 그래서 이 방식은 비활성화되었고,
+            항상 <b>전용 프로필</b>로 크롤링합니다. 네이버는 계정만 입력하면 자동 로그인됩니다.
           </div>
         </div>
 
