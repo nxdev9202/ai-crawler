@@ -253,10 +253,10 @@ async def crawl(
         await detail.close()
         await page.close()
 
-    # === Phase 2 (비로그인 익명 컨텍스트): 리뷰 API만 계정과 분리해 대량 호출 ===
-    log("[쿠팡] 리뷰 수집(비로그인 API) 시작")
+    # === Phase 2: 리뷰 API 대량 호출 (로그인 세션 .userdata 재사용 - Windows 대응) ===
+    log("[쿠팡] 리뷰 수집(API) 시작")
     try:
-        async with anonymous_context(session_id=sid) as actx:
+        async with browser_context(session_id=sid) as actx:
             rpage = actx.pages[0] if actx.pages else await actx.new_page()
             try:
                 await rpage.goto("https://www.coupang.com/", wait_until="domcontentloaded")

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import platform
 import socket
 import subprocess
 from typing import Callable
@@ -49,6 +50,131 @@ def _free_port() -> int:
     port = s.getsockname()[1]
     s.close()
     return port
+
+
+def _real_chrome_user_data() -> str | None:
+    """사용자가 평소 쓰는 실제 크롬 프로필 폴더(OS별)."""
+    system = platform.system()
+    if system == "Windows":
+        base = os.environ.get("LOCALAPPDATA", "")
+        p = os.path.join(base, "Google", "Chrome", "User Data")
+    elif system == "Darwin":
+        p = os.path.expanduser("~/Library/Application Support/Google/Chrome")
+    else:
+        p = os.path.expanduser("~/.config/google-chrome")
+    return p if os.path.isdir(p) else None
+
+
+def _sanitize_cookie(c: dict) -> dict:
+    ck = {
+        "name": c.get("name"),
+        "value": c.get("value"),
+        "domain": c.get("domain"),
+        "path": c.get("path") or "/",
+        "secure": bool(c.get("secure")),
+        "httpOnly": bool(c.get("httpOnly")),
+    }
+    if isinstance(c.get("expires"), (int, float)) and c["expires"] > 0:
+        ck["expires"] = c["expires"]
+    ss = c.get("sameSite")
+    if ss in ("Strict", "Lax", "None"):
+        ck["sameSite"] = ss
+    return ck
+
+
+async def import_coupang_session(on_progress: Callable[[str], None] | None = None) -> dict:
+    """사용자 실제 크롬을 CDP로 잠깐 띄워 쿠팡 쿠키를 받아(크롬이 복호화) .userdata에 주입.
+
+    최신 Windows 크롬의 앱단위 암호화(ABE)로 앱이 직접 쿠키를 못 읽는 문제를 우회한다.
+    사용자 크롬이 실행 중이면 프로필이 잠겨 실패하므로 완전히 종료해야 한다.
+    """
+    log = on_progress or (lambda _m: None)
+    chrome = _chrome_path()
+    real_dir = _real_chrome_user_data()
+    if not chrome:
+        return {"ok": False, "error": "Google Chrome 실행 파일을 찾을 수 없습니다."}
+    if not real_dir:
+        return {"ok": False, "error": "크롬 사용자 프로필 폴더를 찾을 수 없습니다."}
+
+    log("[쿠팡세션] 사용자 크롬에서 쿠팡 쿠키를 읽는 중… (크롬이 켜져 있으면 완전히 종료하세요)")
+    port = _free_port()
+    proc = subprocess.Popen(
+        [
+            chrome,
+            f"--remote-debugging-port={port}",
+            f"--user-data-dir={real_dir}",
+            "--headless=new",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    coupang_cookies: list[dict] = []
+    try:
+        async with async_playwright() as p:
+            browser = None
+            for _ in range(20):
+                try:
+                    browser = await p.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+                    break
+                except Exception:
+                    await asyncio.sleep(1)
+            if browser is None:
+                return {"ok": False, "error": "크롬 연결 실패 — 크롬을 완전히 종료한 뒤 다시 시도하세요."}
+            for ctx in browser.contexts:
+                try:
+                    for c in await ctx.cookies():
+                        if "coupang" in (c.get("domain") or ""):
+                            coupang_cookies.append(_sanitize_cookie(c))
+                except Exception:
+                    pass
+    finally:
+        try:
+            proc.terminate()
+            proc.wait(timeout=8)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    if not coupang_cookies:
+        return {
+            "ok": False,
+            "error": "쿠팡 쿠키를 찾지 못했습니다. 평소 크롬에서 쿠팡에 로그인한 뒤(그리고 크롬 종료 후) 다시 시도하세요.",
+        }
+
+    # .userdata 프로필에 주입 + 로그인 확인
+    log(f"[쿠팡세션] 쿠키 {len(coupang_cookies)}개 확보 → 크롤러 프로필에 주입")
+    _clear_locks()
+    logged = False
+    async with async_playwright() as p:
+        ctx = await p.chromium.launch_persistent_context(
+            USER_DATA_DIR, headless=True, channel="chrome"
+        )
+        try:
+            try:
+                await ctx.add_cookies(coupang_cookies)
+            except Exception:
+                for ck in coupang_cookies:
+                    try:
+                        await ctx.add_cookies([ck])
+                    except Exception:
+                        pass
+            page = ctx.pages[0] if ctx.pages else await ctx.new_page()
+            await page.goto("https://www.coupang.com/", wait_until="domcontentloaded")
+            await page.wait_for_timeout(2500)
+            try:
+                logged = "로그아웃" in (await page.inner_text("body"))
+            except Exception:
+                logged = False
+        finally:
+            await ctx.close()
+        _clear_locks()
+
+    log(f"[쿠팡세션] 완료 — 로그인 감지: {logged}")
+    return {"ok": True, "count": len(coupang_cookies), "logged_in": logged}
 
 
 def _clear_locks() -> None:

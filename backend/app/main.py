@@ -115,11 +115,20 @@ async def _run_login(site: str) -> None:
         st["logs"].append(m)
 
     try:
-        # 진짜 Chrome + CDP로 로그인(Akamai 우회). 세션은 .userdata에 저장됨.
-        from .crawlers.cdp_login import login_via_cdp  # 지연 import
+        if site == "coupang":
+            # 쿠팡: 사용자 실제 크롬에서 쿠키를 가져와 .userdata에 주입(ABE 우회, Windows 대응)
+            from .crawlers.cdp_login import import_coupang_session
 
-        ok = await login_via_cdp(site, on_progress=log)
-        st["logged_in"] = bool(ok)
+            r = await import_coupang_session(on_progress=log)
+            if not r.get("ok"):
+                log(f"[쿠팡세션] 실패: {r.get('error')}")
+            st["logged_in"] = bool(r.get("logged_in"))
+        else:
+            # 네이버: 진짜 Chrome + CDP로 로그인. 세션은 .userdata에 저장됨.
+            from .crawlers.cdp_login import login_via_cdp
+
+            ok = await login_via_cdp(site, on_progress=log)
+            st["logged_in"] = bool(ok)
     except Exception as e:  # noqa: BLE001
         log(f"[오류] {type(e).__name__}: {e}")
         st["logged_in"] = False

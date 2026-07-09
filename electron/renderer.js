@@ -277,7 +277,7 @@ async function openAccounts() {
   try {
     const a = await window.api.getAccounts();
     $("acc_naver_id").value = a.naver_id || "";
-    $("acc_coupang_email").value = a.coupang_email || "";
+    if ($("acc_coupang_email")) $("acc_coupang_email").value = a.coupang_email || "";
     // 드롭다운: 저장된 모델이 목록에 없으면 옵션으로 추가 후 선택
     const sel = $("acc_gemini_model");
     const m = a.gemini_model || "gemini-3.5-flash";
@@ -309,17 +309,17 @@ $("acctSave").addEventListener("click", async () => {
   const data = {
     naver_id: $("acc_naver_id").value.trim(),
     naver_pw: $("acc_naver_pw").value,
-    coupang_email: $("acc_coupang_email").value.trim(),
-    coupang_pw: $("acc_coupang_pw").value,
+    coupang_email: $("acc_coupang_email") ? $("acc_coupang_email").value.trim() : "",
+    coupang_pw: $("acc_coupang_pw") ? $("acc_coupang_pw").value : "",
     gemini_api_key: $("acc_gemini_api_key").value.trim(),
-    gemini_model: $("acc_gemini_model").value.trim(),
+    gemini_model: $("acc_gemini_model").value,
   };
   $("acctSave").disabled = true;
   $("acctMsg").textContent = "저장 중…";
   try {
     const a = await window.api.setAccounts(data);
     $("acc_naver_pw").value = "";
-    $("acc_coupang_pw").value = "";
+    if ($("acc_coupang_pw")) $("acc_coupang_pw").value = "";
     $("acc_gemini_api_key").value = "";
     setLoginDot("Naver", a.naver_set ? null : false, a.naver_set ? "계정 설정됨" : "계정 없음");
     setLoginDot("Coupang", a.coupang_set ? null : false, a.coupang_set ? "계정 설정됨" : "계정 없음");
