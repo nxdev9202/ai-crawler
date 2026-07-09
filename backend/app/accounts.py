@@ -20,8 +20,12 @@ FIELDS = (
     "coupang_pw",
     "gemini_api_key",
     "gemini_model",
-    "use_real_chrome",   # "1"이면 크롤러가 사용자 실제 크롬 프로필로 동작
-    "chrome_profile",    # 실제 크롬 프로필 디렉터리(예: Default, "Profile 1")
+    "use_real_chrome",   # (사용 안 함) 실제 크롬 프로필 방식 — 크롬 보안으로 비활성화됨
+    "chrome_profile",    # (사용 안 함)
+    "proxy_enabled",     # "1"이면 크롤 시 프록시 사용(쿠팡 Akamai IP차단 우회)
+    "proxy_server",      # 예: http://host:port  또는  socks5://host:port
+    "proxy_username",    # 로테이팅 프록시면 user-session-{session} 형태 가능
+    "proxy_password",
 )
 
 
@@ -36,6 +40,10 @@ def get_accounts() -> dict[str, str]:
         "gemini_model": settings.gemini_model or "gemini-3.5-flash",
         "use_real_chrome": "",
         "chrome_profile": "Default",
+        "proxy_enabled": "",
+        "proxy_server": settings.proxy_server or "",
+        "proxy_username": settings.proxy_username or "",
+        "proxy_password": settings.proxy_password or "",
     }
     if ACCOUNTS_FILE.exists():
         try:
@@ -59,9 +67,15 @@ def save_accounts(update: dict[str, Any]) -> dict[str, str]:
             current = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8"))
         except Exception:
             current = {}
+    # 토글 필드는 "0"/빈값도 명시적으로 저장(꺼짐 상태가 유지되도록).
+    TOGGLE = {"proxy_enabled", "use_real_chrome"}
     for k in FIELDS:
+        if k not in update:
+            continue
         v = update.get(k)
-        if v:
+        if k in TOGGLE:
+            current[k] = "1" if v == "1" else "0"
+        elif v:
             current[k] = v
     ACCOUNTS_FILE.write_text(json.dumps(current, ensure_ascii=False, indent=2), encoding="utf-8")
     return get_accounts()
@@ -82,6 +96,10 @@ def masked_status() -> dict[str, Any]:
         "use_real_chrome": acc.get("use_real_chrome") == "1",
         "chrome_profile": acc.get("chrome_profile") or "Default",
         "chrome_profiles": _list_profiles(),
+        "proxy_enabled": acc.get("proxy_enabled") == "1",
+        "proxy_server": acc.get("proxy_server") or "",
+        "proxy_set": bool(acc.get("proxy_server")),
+        "proxy_username": acc.get("proxy_username") or "",
     }
 
 
@@ -92,6 +110,25 @@ def _list_profiles() -> list:
         return list_chrome_profiles()
     except Exception:
         return []
+
+
+def get_proxy_config() -> dict[str, str]:
+    """크롤에 사용할 프록시 설정. proxy_enabled가 "1"이고 서버가 있을 때만 반환.
+
+    반환: {"server": ..., "username": ..., "password": ...} 또는 {} (비활성).
+    """
+    acc = get_accounts()
+    if acc.get("proxy_enabled") != "1":
+        return {}
+    server = (acc.get("proxy_server") or "").strip()
+    if not server:
+        return {}
+    out = {"server": server}
+    if acc.get("proxy_username"):
+        out["username"] = acc["proxy_username"]
+    if acc.get("proxy_password"):
+        out["password"] = acc["proxy_password"]
+    return out
 
 
 def get_gemini_config() -> dict[str, str]:

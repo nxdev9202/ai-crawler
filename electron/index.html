@@ -447,6 +447,25 @@
           <a href="https://aistudio.google.com/apikey" target="_blank" style="font-size:11.5px;color:var(--accent2,#4a9eff)">키 발급 →</a>
         </div>
 
+        <div class="acct-group">
+          <div class="acct-group__top">
+            <span class="chip" style="background:#22a06b;color:#fff">프록시</span>
+            <span class="login-txt" style="margin-left:0">레지덴셜 프록시로 크롤 (쿠팡 IP차단 우회)</span>
+            <label class="switch"><input type="checkbox" id="acc_proxy_enabled" /><span class="switch__sl"></span></label>
+          </div>
+          <input type="text" id="acc_proxy_server" placeholder="프록시 서버 (예: http://gate.provider.com:8000)" autocomplete="off" />
+          <input type="text" id="acc_proxy_username" placeholder="프록시 사용자명 (선택, 로테이팅이면 …-session-{session})" autocomplete="off" />
+          <input type="password" id="acc_proxy_password" placeholder="프록시 비밀번호 (선택)" autocomplete="off" />
+          <div class="acct-group__top" style="margin-top:6px">
+            <button class="btn-mini" id="proxyTest">프록시 테스트</button>
+            <span class="login-txt" id="proxyTestMsg" style="margin-left:0"></span>
+          </div>
+          <div class="acct-hint">
+            회사 공인 IP가 쿠팡(Akamai)에 차단된 상태입니다. 주거용(residential) 프록시로 깨끗한 IP를 태우면 통과됩니다.<br />
+            서버 입력 → <b>저장</b> → <b>프록시 테스트</b>로 IP·쿠팡 접속 확인 → 토글 ON 후 크롤.
+          </div>
+        </div>
+
         <div class="modal__actions">
           <button class="btn btn--ghost" id="acctCheck">로그인 상태 확인</button>
           <button class="btn btn--primary" id="acctSave"><span class="btn__label">저장</span></button>

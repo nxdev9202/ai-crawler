@@ -321,6 +321,11 @@ async function openAccounts() {
       ? profs.map((p) => `<option value="${esc(p.dir)}">${esc(p.name)}${p.email ? " · " + esc(p.email) : ""} (${esc(p.dir)})</option>`).join("")
       : `<option value="Default">Default</option>`;
     psel.value = a.chrome_profile || "Default";
+    // 프록시
+    $("acc_proxy_enabled").checked = !!a.proxy_enabled;
+    $("acc_proxy_server").value = a.proxy_server || "";
+    $("acc_proxy_username").value = a.proxy_username || "";
+    $("proxyTestMsg").textContent = "";
   } catch (e) {
     $("acctMsg").textContent = "불러오기 실패: " + e.message;
   }
@@ -343,8 +348,12 @@ $("acctSave").addEventListener("click", async () => {
     coupang_pw: $("acc_coupang_pw") ? $("acc_coupang_pw").value : "",
     gemini_api_key: $("acc_gemini_api_key").value.trim(),
     gemini_model: $("acc_gemini_model").value,
-    use_real_chrome: $("acc_use_real_chrome").checked ? "1" : "0",
+    use_real_chrome: "0",
     chrome_profile: $("acc_chrome_profile").value || "Default",
+    proxy_enabled: $("acc_proxy_enabled").checked ? "1" : "0",
+    proxy_server: $("acc_proxy_server").value.trim(),
+    proxy_username: $("acc_proxy_username").value.trim(),
+    proxy_password: $("acc_proxy_password").value,
   };
   $("acctSave").disabled = true;
   $("acctMsg").textContent = "저장 중…";
@@ -353,6 +362,7 @@ $("acctSave").addEventListener("click", async () => {
     $("acc_naver_pw").value = "";
     if ($("acc_coupang_pw")) $("acc_coupang_pw").value = "";
     $("acc_gemini_api_key").value = "";
+    $("acc_proxy_password").value = "";
     setLoginDot("Naver", a.naver_set ? null : false, a.naver_set ? "계정 설정됨" : "계정 없음");
     setLoginDot("Coupang", a.coupang_set ? null : false, a.coupang_set ? "계정 설정됨" : "계정 없음");
     setLoginDot("Gemini", a.gemini_set ? true : false, a.gemini_set ? "키 설정됨 " + (a.gemini_key_hint || "") : "키 없음");
@@ -363,6 +373,31 @@ $("acctSave").addEventListener("click", async () => {
     $("acctSave").disabled = false;
   }
 });
+/* 프록시 테스트: 저장된 프록시로 공인 IP·쿠팡 접속 확인 */
+$("proxyTest").addEventListener("click", async () => {
+  const btn = $("proxyTest");
+  const msg = $("proxyTestMsg");
+  btn.disabled = true;
+  msg.textContent = "테스트 중… (최대 40초)";
+  msg.style.color = "";
+  try {
+    const r = await window.api.proxyTest();
+    const ipTxt = r.ip ? `IP ${r.ip}${r.proxy_used ? "(프록시)" : "(직접)"}` : "IP 확인 실패";
+    if (r.coupang_ok) {
+      msg.textContent = `✓ ${ipTxt} · 쿠팡 접속 정상`;
+      msg.style.color = "#22a06b";
+    } else {
+      msg.textContent = `${ipTxt} · 쿠팡 ✗ ${r.detail || ""}`;
+      msg.style.color = "#e5533d";
+    }
+  } catch (e) {
+    msg.textContent = "테스트 실패: " + e.message;
+    msg.style.color = "#e5533d";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 /* 미리 로그인: 브라우저 창을 열어 세션을 .userdata에 저장. 2차 인증은 창에서 처리 */
 async function preLogin(site, siteKey) {
   const btn = $("login" + siteKey);

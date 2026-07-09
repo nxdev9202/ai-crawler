@@ -21,21 +21,26 @@ USER_DATA_DIR = userdata_dir()
 def proxy_kwargs(session_id: str | None = None) -> dict:
     """설정된 프록시를 Playwright launch 옵션으로 변환.
 
-    PROXY_SERVER가 비어 있으면 빈 dict(프록시 비활성). 로테이팅 프록시에서
-    '크롤 단위 sticky IP'를 쓰려면 PROXY_USERNAME에 `{session}` 토큰을 넣으면 되고,
-    크롤마다 다른 session_id로 치환되어 세션 내 IP 고정 + 크롤 간 IP 변경이 된다.
-    (예: PROXY_USERNAME=user-session-{session})
+    앱 설정(.accounts.json)의 프록시를 우선 사용하고, 없으면 .env 폴백.
+    프록시가 비활성/미설정이면 빈 dict. 로테이팅 프록시에서 '크롤 단위 sticky IP'를
+    쓰려면 username에 `{session}` 토큰을 넣으면 크롤마다 session_id로 치환된다.
+    (예: user-session-{session})
     """
-    if not settings.proxy_server:
+    from ..accounts import get_proxy_config
+
+    cfg = get_proxy_config()
+    server = cfg.get("server") if cfg else (settings.proxy_server or "")
+    if not server:
         return {}
-    proxy: dict[str, str] = {"server": settings.proxy_server}
-    if settings.proxy_username:
-        user = settings.proxy_username
+    proxy: dict[str, str] = {"server": server}
+    user = cfg.get("username") if cfg else settings.proxy_username
+    if user:
         if session_id and "{session}" in user:
             user = user.replace("{session}", session_id)
         proxy["username"] = user
-    if settings.proxy_password:
-        proxy["password"] = settings.proxy_password
+    pw = cfg.get("password") if cfg else settings.proxy_password
+    if pw:
+        proxy["password"] = pw
     return {"proxy": proxy}
 
 

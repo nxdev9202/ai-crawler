@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld("api", {
   loginStatus: () => req("GET", "/login-status"),
   login: (site) => req("POST", `/login/${site}`),
   loginProgress: (site) => req("GET", `/login/${site}/progress`),
+  proxyTest: () => req("POST", "/proxy-test"),
 });
 
 // 앱 업데이트 제어(메인 프로세스 IPC)

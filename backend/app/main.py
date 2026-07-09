@@ -50,6 +50,10 @@ class AccountsReq(BaseModel):
     gemini_model: Optional[str] = None
     use_real_chrome: Optional[str] = None
     chrome_profile: Optional[str] = None
+    proxy_enabled: Optional[str] = None
+    proxy_server: Optional[str] = None
+    proxy_username: Optional[str] = None
+    proxy_password: Optional[str] = None
 
 
 @app.on_event("startup")
@@ -86,6 +90,90 @@ async def set_accounts(req: AccountsReq) -> dict[str, Any]:
     """전용 크롤링 계정 저장."""
     save_accounts(req.model_dump(exclude_none=True))
     return masked_status()
+
+
+@app.post("/proxy-test")
+async def proxy_test() -> dict[str, Any]:
+    """저장된 프록시로 실제 접속을 테스트한다.
+
+    - 외부에서 보이는 공인 IP(프록시가 실제로 태워지는지)
+    - 쿠팡 검색이 Access Denied 없이 열리는지(Akamai 통과 여부)
+    반환: {ok, ip, coupang_ok, detail}
+    """
+    from .accounts import get_accounts as _ga
+
+    acc = _ga()
+    server = (acc.get("proxy_server") or "").strip()
+    proxy = None
+    if server:
+        proxy = {"server": server}
+        if acc.get("proxy_username"):
+            u = acc["proxy_username"]
+            proxy["username"] = u.replace("{session}", "test") if "{session}" in u else u
+        if acc.get("proxy_password"):
+            proxy["password"] = acc["proxy_password"]
+
+    from playwright.async_api import async_playwright  # 지연 import
+
+    ip = ""
+    coupang_ok = False
+    detail = ""
+    try:
+        async with async_playwright() as p:
+            launch_kwargs: dict[str, Any] = {"headless": True}
+            if proxy:
+                launch_kwargs["proxy"] = proxy
+            launch_kwargs["args"] = ["--disable-blink-features=AutomationControlled"]
+            launch_kwargs["ignore_default_args"] = ["--enable-automation"]
+            browser = await p.chromium.launch(channel="chrome", **launch_kwargs)
+            try:
+                from .crawlers.base import STEALTH_JS, USER_AGENT
+
+                ctx = await browser.new_context(
+                    locale="ko-KR", timezone_id="Asia/Seoul", user_agent=USER_AGENT,
+                    viewport={"width": 1440, "height": 900},
+                )
+                await ctx.add_init_script(STEALTH_JS)
+                page = await ctx.new_page()
+                page.set_default_navigation_timeout(30000)
+                # 1) 공인 IP 확인
+                try:
+                    await page.goto("https://api.ipify.org?format=json", wait_until="domcontentloaded")
+                    import json as _json
+                    body = await page.inner_text("body")
+                    ip = _json.loads(body).get("ip", "")
+                except Exception as e:  # noqa: BLE001
+                    detail = f"IP 확인 실패: {str(e)[:120]}"
+                # 2) 쿠팡 검색 접속 확인
+                try:
+                    await page.goto(
+                        "https://www.coupang.com/np/search?q=%EC%8B%9D%EC%9A%A9%EC%9C%A0&channel=user",
+                        wait_until="domcontentloaded",
+                    )
+                    await page.wait_for_timeout(2500)
+                    tb = await page.inner_text("body")
+                    n = await page.locator(
+                        'li.search-product, ul#productList > li, li[class*="ProductUnit"]'
+                    ).count()
+                    coupang_ok = ("Access Denied" not in tb) and n > 0
+                    if not coupang_ok:
+                        detail = (detail + " | " if detail else "") + (
+                            "쿠팡 Access Denied(차단)" if "Access Denied" in tb else "상품 목록 미검출"
+                        )
+                except Exception as e:  # noqa: BLE001
+                    detail = (detail + " | " if detail else "") + f"쿠팡 접속 실패: {str(e)[:120]}"
+            finally:
+                await browser.close()
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "ip": ip, "coupang_ok": False, "detail": f"실행 오류: {str(e)[:160]}"}
+
+    return {
+        "ok": bool(ip),
+        "ip": ip,
+        "proxy_used": bool(proxy),
+        "coupang_ok": coupang_ok,
+        "detail": detail or ("정상" if coupang_ok else ""),
+    }
 
 
 @app.get("/login-status")
