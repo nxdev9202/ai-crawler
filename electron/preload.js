@@ -1,4 +1,4 @@
-const { contextBridge } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
 const BASE = "http://127.0.0.1:8756";
 
@@ -29,4 +29,12 @@ contextBridge.exposeInMainWorld("api", {
   loginStatus: () => req("GET", "/login-status"),
   login: (site) => req("POST", `/login/${site}`),
   loginProgress: (site) => req("GET", `/login/${site}/progress`),
+});
+
+// 앱 업데이트 제어(메인 프로세스 IPC)
+contextBridge.exposeInMainWorld("updater", {
+  version: () => ipcRenderer.invoke("app:version"),
+  check: () => ipcRenderer.invoke("update:check"),
+  install: () => ipcRenderer.invoke("update:install"),
+  onStatus: (cb) => ipcRenderer.on("update:status", (_e, d) => cb(d)),
 });

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, dialog } = require("electron");
+const { app, BrowserWindow, shell, dialog, ipcMain } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
@@ -82,18 +82,29 @@ function createWindow() {
   });
 }
 
-// 자동 업데이트: GitHub Releases(private)에서 최신 버전 확인 → 백그라운드 다운로드 → 종료 시 설치
+// 자동 업데이트: GitHub Releases(private) 확인 → 다운로드 → 종료 시 설치.
+// 진행 상태는 렌더러(update:status)로 보내 UI에 표시하고, 수동 버튼도 지원.
+let autoUpdater = null;
+
+function sendStatus(data) {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("update:status", data);
+  } catch (_) {}
+}
+
 function setupAutoUpdate() {
-  if (!app.isPackaged) return; // 개발 중엔 비활성
-  if (!UPDATE_TOKEN || UPDATE_TOKEN.includes("UPDATE_TOKEN")) {
-    console.log("[update] 토큰 미설정 - 자동 업데이트 비활성");
+  if (!app.isPackaged) {
+    sendStatus({ state: "disabled", reason: "개발 모드" });
     return;
   }
-  let autoUpdater;
+  if (!UPDATE_TOKEN || UPDATE_TOKEN.includes("UPDATE_TOKEN")) {
+    sendStatus({ state: "disabled", reason: "업데이트 토큰 미설정" });
+    return;
+  }
   try {
     ({ autoUpdater } = require("electron-updater"));
   } catch (e) {
-    console.error("[update] electron-updater 로드 실패:", e.message);
+    sendStatus({ state: "error", message: "updater 로드 실패: " + e.message });
     return;
   }
   autoUpdater.autoDownload = true;
@@ -105,23 +116,31 @@ function setupAutoUpdate() {
     private: true,
     token: UPDATE_TOKEN,
   });
-  autoUpdater.on("error", (err) => console.error("[update] error:", err?.message));
-  autoUpdater.on("update-available", (info) => console.log("[update] 새 버전:", info.version));
-  autoUpdater.on("update-downloaded", async (info) => {
-    const res = await dialog.showMessageBox({
-      type: "info",
-      buttons: ["지금 재시작", "나중에"],
-      defaultId: 0,
-      title: "업데이트 준비됨",
-      message: `새 버전 ${info.version} 이(가) 준비되었습니다.`,
-      detail: "지금 재시작하면 업데이트가 적용됩니다. (나중에 선택 시 다음 종료 때 자동 적용)",
-    });
-    if (res.response === 0) autoUpdater.quitAndInstall();
-  });
-  // 실행 직후 + 이후 6시간마다 확인
+  autoUpdater.on("checking-for-update", () => sendStatus({ state: "checking" }));
+  autoUpdater.on("update-available", (info) => sendStatus({ state: "available", version: info.version }));
+  autoUpdater.on("update-not-available", () => sendStatus({ state: "latest", version: app.getVersion() }));
+  autoUpdater.on("download-progress", (p) => sendStatus({ state: "downloading", percent: Math.round(p.percent) }));
+  autoUpdater.on("update-downloaded", (info) => sendStatus({ state: "downloaded", version: info.version }));
+  autoUpdater.on("error", (err) => sendStatus({ state: "error", message: String((err && err.message) || err) }));
+
   autoUpdater.checkForUpdates().catch(() => {});
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
 }
+
+// 렌더러 → 메인: 수동 업데이트 제어
+ipcMain.handle("app:version", () => app.getVersion());
+ipcMain.handle("update:check", async () => {
+  if (!autoUpdater) return { ok: false, reason: app.isPackaged ? "업데이트 비활성(토큰 미설정)" : "개발 모드" };
+  try {
+    const r = await autoUpdater.checkForUpdates();
+    return { ok: true, version: r && r.updateInfo && r.updateInfo.version };
+  } catch (e) {
+    return { ok: false, reason: String((e && e.message) || e) };
+  }
+});
+ipcMain.handle("update:install", () => {
+  if (autoUpdater) autoUpdater.quitAndInstall();
+});
 
 app.whenReady().then(() => {
   startBackend();

@@ -94,6 +94,12 @@
       .sess__meta { display: flex; align-items: center; gap: 7px; }
       .sess__count { font-family: var(--mono); font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
       .rail__empty { color: var(--text-faint); font-size: 12.5px; padding: 8px 6px; line-height: 1.6; }
+      .rail__foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border-soft); display: flex; flex-direction: column; gap: 8px; }
+      .rail__ver { font-size: 11.5px; color: var(--text-faint); }
+      .rail__ver span { font-family: var(--mono); color: var(--text-dim); }
+      .update-status { font-size: 11.5px; color: var(--text-dim); line-height: 1.5; min-height: 14px; }
+      .update-status.err { color: var(--danger); }
+      .update-status.ok { color: var(--good); }
 
       .pill { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 20px; letter-spacing: 0.2px; border: 1px solid transparent; }
       .pill--done { color: var(--good); background: var(--accent-soft); }
@@ -279,6 +285,12 @@
         <div class="rail__label">세션 기록</div>
         <div class="sessions" id="sessions">
           <div class="rail__empty">아직 실행한 세션이 없습니다.<br />검색어를 입력해 첫 크롤링을 시작하세요.</div>
+        </div>
+
+        <div class="rail__foot">
+          <div class="rail__ver">버전 <span id="appVer">–</span></div>
+          <button class="btn-mini" id="updateBtn">업데이트 확인</button>
+          <div class="update-status" id="updateStatus"></div>
         </div>
       </aside>
 

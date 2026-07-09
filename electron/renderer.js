@@ -427,4 +427,41 @@ async function init() {
   }
 }
 
+/* ===== 앱 업데이트 UI ===== */
+(async () => {
+  if (!window.updater) return;
+  try {
+    $("appVer").textContent = await window.updater.version();
+  } catch {}
+  const st = $("updateStatus");
+  const setSt = (txt, cls = "") => {
+    st.textContent = txt;
+    st.className = "update-status" + (cls ? " " + cls : "");
+  };
+  window.updater.onStatus((d) => {
+    if (d.state === "checking") setSt("업데이트 확인 중…");
+    else if (d.state === "available") setSt(`새 버전 ${d.version} 발견, 다운로드 중…`);
+    else if (d.state === "downloading") setSt(`다운로드 중… ${d.percent}%`);
+    else if (d.state === "downloaded") {
+      setSt(`새 버전 ${d.version} 준비됨 — 클릭해 재시작`, "ok");
+      st.style.cursor = "pointer";
+      st.onclick = () => window.updater.install();
+    } else if (d.state === "latest") setSt("최신 버전입니다", "ok");
+    else if (d.state === "disabled") setSt("자동 업데이트 " + (d.reason || "비활성"));
+    else if (d.state === "error") setSt("업데이트 오류: " + (d.message || ""), "err");
+  });
+  $("updateBtn").addEventListener("click", async () => {
+    $("updateBtn").disabled = true;
+    setSt("업데이트 확인 중…");
+    try {
+      const r = await window.updater.check();
+      if (!r.ok) setSt("확인 실패: " + (r.reason || ""), "err");
+    } catch (e) {
+      setSt("확인 실패: " + e.message, "err");
+    } finally {
+      setTimeout(() => ($("updateBtn").disabled = false), 2000);
+    }
+  });
+})();
+
 connectionLoop();
