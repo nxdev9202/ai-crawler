@@ -67,6 +67,17 @@ def parse_cookies(raw: str) -> list[dict[str, Any]]:
     if not raw:
         return []
     data = json.loads(raw)  # 실패하면 상위에서 처리
+    # 암호화 백업 형식(hotcleaner Cookie Manager 등): {"url":..,"version":..,"data":"<암호문>"}
+    if (
+        isinstance(data, dict)
+        and isinstance(data.get("data"), str)
+        and "cookies" not in data
+        and ("version" in data or "url" in data)
+    ):
+        raise ValueError(
+            "암호화된 백업 형식이라 읽을 수 없습니다. 'Cookie-Editor'(cookie-editor.com) 확장의 "
+            "Export(JSON)를 사용하세요 — 평문 JSON을 줍니다."
+        )
     # storage_state 형식: {"cookies":[...]}
     if isinstance(data, dict) and isinstance(data.get("cookies"), list):
         data = data["cookies"]
