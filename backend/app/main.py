@@ -11,14 +11,11 @@ from pydantic import BaseModel
 from sqlalchemy import select, update
 
 from .accounts import get_accounts, masked_status, save_accounts
-from .analysis.gemini import analyze_session
-from .analysis.nlp import analyze_reviews
 from .config import settings
-from .crawlers import coupang as coupang_crawler
-from .crawlers import login as site_login
-from .crawlers import naver as naver_crawler
-from .crawlers.cdp_login import login_via_cdp
 from .db import Analysis, CrawlSession, Product, SessionLocal, init_db
+
+# 무거운 모듈(playwright/google-genai/kiwipiepy)은 백엔드 시작 속도를 위해
+# 최상단에서 import하지 않고, 실제로 쓰는 함수 안에서 지연 import한다.
 
 app = FastAPI(title="AI 분석 크롤러")
 app.add_middleware(
@@ -92,6 +89,8 @@ async def set_accounts(req: AccountsReq) -> dict[str, Any]:
 @app.get("/login-status")
 async def login_status() -> dict[str, Any]:
     """네이버·쿠팡 로그인 상태 확인(전용 프로필 기준)."""
+    from .crawlers import login as site_login  # 지연 import
+
     result: dict[str, Any] = {}
     try:
         result["naver"] = await site_login.check_login()
@@ -117,6 +116,8 @@ async def _run_login(site: str) -> None:
 
     try:
         # 진짜 Chrome + CDP로 로그인(Akamai 우회). 세션은 .userdata에 저장됨.
+        from .crawlers.cdp_login import login_via_cdp  # 지연 import
+
         ok = await login_via_cdp(site, on_progress=log)
         st["logged_in"] = bool(ok)
     except Exception as e:  # noqa: BLE001
@@ -155,6 +156,10 @@ async def login_progress(site: str) -> dict[str, Any]:
 
 async def _run_crawl(session_id: int, query: str, sources: list[str], max_products: Optional[int]) -> None:
     """백그라운드 크롤링 작업. 상품을 1개씩 즉시 DB에 저장(증분)."""
+    from .analysis.nlp import analyze_reviews  # 지연 import
+    from .crawlers import coupang as coupang_crawler
+    from .crawlers import naver as naver_crawler
+
     def log(msg: str) -> None:
         PROGRESS[session_id].append(msg)
 
@@ -356,6 +361,8 @@ async def analyze(sid: int, req: AnalyzeReq) -> dict[str, Any]:
             }
             for p in products
         ]
+        from .analysis.gemini import analyze_session  # 지연 import
+
         try:
             result = await analyze_session(sess.query, payload, req.prompt)
         except Exception as e:  # noqa: BLE001

@@ -9,14 +9,15 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from kiwipiepy import Kiwi
-
-_kiwi: Kiwi | None = None
+_kiwi = None
 
 
-def _get_kiwi() -> Kiwi:
+def _get_kiwi():
+    # kiwipiepy는 무거워서 최초 사용 시점에만 import/로딩(백엔드 시작 속도 향상)
     global _kiwi
     if _kiwi is None:
+        from kiwipiepy import Kiwi
+
         _kiwi = Kiwi()
     return _kiwi
 

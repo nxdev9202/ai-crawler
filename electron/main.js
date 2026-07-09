@@ -41,28 +41,24 @@ function startBackend() {
     const py = fs.existsSync(venvPy) ? venvPy : isWin ? "python" : "python3";
     backendProc = spawn(py, ["-m", "app.main"], { cwd: backendDir, env });
   }
-  backendProc.stdout.on("data", (d) => console.log(`[backend] ${d}`));
-  backendProc.stderr.on("data", (d) => console.log(`[backend] ${d}`));
-  backendProc.on("exit", (code) => console.log(`[backend] exited ${code}`));
-}
-
-// 백엔드 헬스체크 대기
-function waitForBackend(retries = 40) {
-  return new Promise((resolve, reject) => {
-    const tick = (n) => {
-      http
-        .get(`${BACKEND_URL}/health`, (res) => {
-          if (res.statusCode === 200) resolve();
-          else retry(n);
-        })
-        .on("error", () => retry(n));
-    };
-    const retry = (n) => {
-      if (n <= 0) return reject(new Error("backend timeout"));
-      setTimeout(() => tick(n - 1), 500);
-    };
-    tick(retries);
-  });
+  // 백엔드 로그를 파일로도 남긴다(문제 진단용): %APPDATA%\NXaiCrawler\backend.log
+  let logStream = null;
+  try {
+    const fs2 = require("fs");
+    const logPath = path.join(app.getPath("userData"), "backend.log");
+    logStream = fs2.createWriteStream(logPath, { flags: "w" });
+    console.log(`[main] backend log → ${logPath}`);
+  } catch (e) {
+    console.error("log file open failed:", e.message);
+  }
+  const pipe = (d) => {
+    const s = `[backend] ${d}`;
+    console.log(s);
+    if (logStream) logStream.write(d);
+  };
+  backendProc.stdout.on("data", pipe);
+  backendProc.stderr.on("data", pipe);
+  backendProc.on("exit", (code) => pipe(`\n[backend] exited with code ${code}\n`));
 }
 
 function createWindow() {
@@ -83,14 +79,9 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   startBackend();
-  try {
-    await waitForBackend();
-    console.log("[main] backend ready");
-  } catch (e) {
-    console.error("[main] backend not ready:", e.message);
-  }
+  // 창을 즉시 띄운다. 백엔드 연결은 렌더러가 폴링하며 로딩 화면을 보여준다.
   createWindow();
 
   app.on("activate", () => {

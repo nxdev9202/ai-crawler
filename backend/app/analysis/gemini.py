@@ -4,9 +4,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from google import genai
-from google.genai import types
-
 from ..config import settings
 
 DEFAULT_INSTRUCTION = (
@@ -70,6 +67,9 @@ async def analyze_session(
     user_prompt: str | None = None,
 ) -> dict[str, Any]:
     """세션 데이터를 Gemini로 분석하고 결과 텍스트를 반환."""
+    from google import genai
+    from google.genai import types
+
     from ..accounts import get_gemini_config
 
     cfg = get_gemini_config()

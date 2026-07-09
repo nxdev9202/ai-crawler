@@ -380,6 +380,30 @@ $("acctCheck").addEventListener("click", async () => {
   }
 });
 
+/* ===== 백엔드 연결 관리: 연결될 때까지 폴링, 연결되면 오버레이 숨기고 init ===== */
+let backendConnected = false;
+async function connectionLoop() {
+  let tries = 0;
+  const boot = $("bootOverlay");
+  const bootMsg = $("bootMsg");
+  while (!backendConnected) {
+    tries++;
+    try {
+      await window.api.health();
+      backendConnected = true;
+      if (boot) boot.classList.add("hide");
+      setTimeout(() => boot && (boot.style.display = "none"), 400);
+      await init(); // 연결되면 세션 로드
+      refreshHealth();
+      setInterval(refreshHealth, 5000);
+      return;
+    } catch {
+      if (bootMsg && tries > 6) bootMsg.textContent = "백엔드 연결 대기 중… (백신 검사로 지연될 수 있음)";
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+}
+
 /* ===== 시작 시: 진행 중 세션 자동 복원, 없으면 최근 세션 표시 ===== */
 async function init() {
   await refreshHealth();
@@ -394,5 +418,4 @@ async function init() {
   }
 }
 
-init();
-setInterval(refreshHealth, 5000);
+connectionLoop();
