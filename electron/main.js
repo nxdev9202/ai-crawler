@@ -107,6 +107,11 @@ function setupAutoUpdate() {
     sendStatus({ state: "error", message: "updater 로드 실패: " + e.message });
     return;
   }
+  // 자체서명 인증서라 electron-updater의 Windows 게시자명 검증이 실패한다.
+  // 업데이트는 HTTPS + 인증된 private 저장소에서만 오므로 게시자명 검증은 건너뛴다.
+  try {
+    autoUpdater.verifySignature = () => Promise.resolve(null);
+  } catch (_) {}
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.setFeedURL({
