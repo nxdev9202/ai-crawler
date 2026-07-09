@@ -57,8 +57,10 @@ jobs:
           npm install
           # 버전 자동 증가(1.0.<run_number>) → 클라이언트가 업데이트 감지
           npm version 1.0.${{ github.run_number }} --no-git-tag-version --allow-same-version
-          # main.js의 플레이스홀더에 읽기전용 토큰 주입(소스에는 저장 안 됨)
-          (Get-Content main.js) -replace '__UPDATE_TOKEN__', $env:UPDATE_TOKEN | Set-Content main.js
+          # main.js의 플레이스홀더에 읽기전용 토큰 주입(리터럴 치환 - 정규식 변형 방지)
+          $c = Get-Content main.js -Raw
+          $c = $c.Replace('__UPDATE_TOKEN__', $env:UPDATE_TOKEN)
+          Set-Content -Path main.js -Value $c -NoNewline -Encoding utf8
           npm run publish
 
       # 3) 설치본 산출물 업로드(Actions에서도 다운로드 가능)

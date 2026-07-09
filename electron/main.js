@@ -107,6 +107,11 @@ function setupAutoUpdate() {
     sendStatus({ state: "error", message: "updater 로드 실패: " + e.message });
     return;
   }
+  // electron-updater는 process.env.GH_TOKEN을 내장 토큰보다 우선한다.
+  // 사용자 PC에 잘못된 GH_TOKEN이 있으면 401이 나므로, 내 읽기전용 토큰으로 강제 지정.
+  process.env.GH_TOKEN = UPDATE_TOKEN;
+  process.env.GITHUB_TOKEN = UPDATE_TOKEN;
+
   // 자체서명 인증서라 electron-updater의 Windows 게시자명 검증이 실패한다.
   // 업데이트는 HTTPS + 인증된 private 저장소에서만 오므로 게시자명 검증은 건너뛴다.
   try {
