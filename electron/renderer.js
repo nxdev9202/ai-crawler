@@ -326,6 +326,12 @@ async function openAccounts() {
     $("acc_proxy_server").value = a.proxy_server || "";
     $("acc_proxy_username").value = a.proxy_username || "";
     $("proxyTestMsg").textContent = "";
+    // 세션 쿠키 상태
+    try {
+      const ck = await window.api.getCookies();
+      renderCookieStat(ck);
+    } catch (_) {}
+    $("cookieMsg").textContent = "";
   } catch (e) {
     $("acctMsg").textContent = "불러오기 실패: " + e.message;
   }
@@ -373,6 +379,57 @@ $("acctSave").addEventListener("click", async () => {
     $("acctSave").disabled = false;
   }
 });
+/* 세션 쿠키 붙여넣기 */
+function renderCookieStat(ck) {
+  const el = $("cookieStat");
+  if (!el) return;
+  const d = (ck && ck.domains) || {};
+  const parts = [];
+  if (d.coupang) parts.push(`쿠팡 ${d.coupang}`);
+  if (d.naver) parts.push(`네이버 ${d.naver}`);
+  if (d["기타"]) parts.push(`기타 ${d["기타"]}`);
+  el.textContent = ck && ck.count ? `저장됨: ${parts.join(" · ")}` : "저장된 쿠키 없음";
+}
+$("cookieSave").addEventListener("click", async () => {
+  const raw = $("acc_cookies").value.trim();
+  const msg = $("cookieMsg");
+  if (!raw) {
+    msg.textContent = "붙여넣은 내용이 없습니다.";
+    msg.style.color = "#e5533d";
+    return;
+  }
+  $("cookieSave").disabled = true;
+  msg.textContent = "저장 중…";
+  msg.style.color = "";
+  try {
+    const r = await window.api.saveCookies(raw);
+    if (r.ok) {
+      msg.textContent = `✓ ${r.count}개 저장됨`;
+      msg.style.color = "#22a06b";
+      $("acc_cookies").value = "";
+      renderCookieStat({ count: r.count, domains: r.domains });
+    } else {
+      msg.textContent = r.error || "저장 실패";
+      msg.style.color = "#e5533d";
+    }
+  } catch (e) {
+    msg.textContent = "저장 실패: " + e.message;
+    msg.style.color = "#e5533d";
+  } finally {
+    $("cookieSave").disabled = false;
+  }
+});
+$("cookieClear").addEventListener("click", async () => {
+  try {
+    await window.api.clearCookies();
+    renderCookieStat({ count: 0, domains: {} });
+    $("cookieMsg").textContent = "삭제됨";
+    $("cookieMsg").style.color = "";
+  } catch (e) {
+    $("cookieMsg").textContent = "삭제 실패: " + e.message;
+  }
+});
+
 /* 프록시 테스트: 저장된 프록시로 공인 IP·쿠팡 접속 확인 */
 $("proxyTest").addEventListener("click", async () => {
   const btn = $("proxyTest");

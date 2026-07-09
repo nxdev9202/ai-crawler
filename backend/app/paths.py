@@ -30,6 +30,11 @@ def accounts_file() -> Path:
     return data_dir() / ".accounts.json"
 
 
+def cookies_file() -> Path:
+    """사용자가 붙여넣은 세션 쿠키(Playwright 형식) 저장 파일."""
+    return data_dir() / ".cookies.json"
+
+
 def real_chrome_user_data() -> str | None:
     """사용자가 평소 쓰는 실제 크롬 프로필 폴더(User Data). OS별 자동 감지."""
     import os

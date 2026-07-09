@@ -31,6 +31,9 @@ contextBridge.exposeInMainWorld("api", {
   login: (site) => req("POST", `/login/${site}`),
   loginProgress: (site) => req("GET", `/login/${site}/progress`),
   proxyTest: () => req("POST", "/proxy-test"),
+  getCookies: () => req("GET", "/cookies"),
+  saveCookies: (raw) => req("POST", "/cookies", { raw }),
+  clearCookies: () => req("DELETE", "/cookies"),
 });
 
 // 앱 업데이트 제어(메인 프로세스 IPC)

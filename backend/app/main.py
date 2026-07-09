@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections import defaultdict
 from typing import Any, Optional
 
@@ -90,6 +91,38 @@ async def set_accounts(req: AccountsReq) -> dict[str, Any]:
     """전용 크롤링 계정 저장."""
     save_accounts(req.model_dump(exclude_none=True))
     return masked_status()
+
+
+class CookiesReq(BaseModel):
+    raw: str = ""
+
+
+@app.get("/cookies")
+async def cookies_status() -> dict[str, Any]:
+    from .cookies import status
+
+    return status()
+
+
+@app.post("/cookies")
+async def cookies_save(req: CookiesReq) -> dict[str, Any]:
+    """붙여넣은 세션 쿠키(JSON) 저장."""
+    from .cookies import save_cookies
+
+    try:
+        return save_cookies(req.raw)
+    except json.JSONDecodeError:
+        return {"ok": False, "count": 0, "error": "JSON 형식이 아닙니다. 확장에서 'Export'한 JSON을 그대로 붙여넣으세요."}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "count": 0, "error": str(e)[:160]}
+
+
+@app.delete("/cookies")
+async def cookies_clear() -> dict[str, Any]:
+    from .cookies import clear_cookies
+
+    clear_cookies()
+    return {"ok": True, "count": 0}
 
 
 @app.post("/proxy-test")

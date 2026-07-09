@@ -66,6 +66,28 @@ window.chrome = { runtime: {} };
 """
 
 
+async def _inject_pasted_cookies(context) -> None:
+    """사용자가 앱에 붙여넣은 세션 쿠키를 컨텍스트에 주입(있을 때만)."""
+    try:
+        from ..cookies import load_cookies
+
+        cookies = load_cookies()
+        if cookies:
+            await context.add_cookies(cookies)
+    except Exception:
+        # 일부 쿠키가 형식 오류여도 크롤 자체는 계속되도록 개별 재시도
+        try:
+            from ..cookies import load_cookies
+
+            for c in load_cookies():
+                try:
+                    await context.add_cookies([c])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+
 def _terminate_chrome_and_unlock(user_data_dir: str) -> None:
     """실제 프로필 크롤 직전, 남아있는 크롬 프로세스 종료 + 프로필 잠금 파일 제거.
 
@@ -188,6 +210,9 @@ async def browser_context(session_id: str | None = None):
             except Exception:
                 pass
 
+        # 사용자가 붙여넣은 세션 쿠키 주입(쿠팡/네이버 로그인·세션 재사용)
+        await _inject_pasted_cookies(context)
+
         try:
             yield context
         finally:
@@ -243,6 +268,8 @@ async def anonymous_context(session_id: str | None = None):
                 await context.add_cookies(bp)
         except Exception:
             pass
+        # 사용자가 붙여넣은 세션 쿠키 주입(리뷰 API도 사용자 세션으로 호출)
+        await _inject_pasted_cookies(context)
         try:
             yield context
         finally:

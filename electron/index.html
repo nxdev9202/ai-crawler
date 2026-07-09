@@ -434,6 +434,24 @@
 
         <div class="acct-group">
           <div class="acct-group__top">
+            <span class="chip" style="background:#7c5cff;color:#fff">세션</span>
+            <span class="login-txt" style="margin-left:0">쿠키 붙여넣기 (로그인·2차인증 건너뛰기)</span>
+            <span class="login-txt" id="cookieStat" style="margin-left:auto;font-size:11.5px;opacity:.8"></span>
+          </div>
+          <textarea id="acc_cookies" rows="4" placeholder='Cookie-Editor 확장에서 Export한 JSON을 붙여넣으세요 ([{"name":...,"value":...,"domain":".coupang.com",...}, ...])' style="width:100%;box-sizing:border-box;resize:vertical;font-family:monospace;font-size:11px"></textarea>
+          <div class="acct-group__top" style="margin-top:6px">
+            <button class="btn-mini" id="cookieSave">쿠키 저장</button>
+            <button class="btn-mini" id="cookieClear">삭제</button>
+            <span class="login-txt" id="cookieMsg" style="margin-left:0"></span>
+          </div>
+          <div class="acct-hint">
+            <b>본인 크롬</b>에 Cookie-Editor 확장 설치 → coupang.com(로그인 상태) 접속 → 확장 아이콘 → <b>Export</b>(JSON) → 여기 붙여넣기.<br />
+            네이버도 같은 방법. <b>주의:</b> 쿠팡은 IP도 봐서, 차단된 회사망에선 쿠키만으론 안 되고 프록시가 필요합니다.
+          </div>
+        </div>
+
+        <div class="acct-group">
+          <div class="acct-group__top">
             <span class="chip" style="background:#4285F4;color:#fff">Gemini</span>
             <span class="login-dot" id="dotGemini" title="키 상태"></span>
             <span class="login-txt" id="txtGemini">확인 전</span>
