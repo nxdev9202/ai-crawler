@@ -74,17 +74,39 @@ async function refreshSessions() {
   el.innerHTML = list
     .map((s) => {
       const total = s.stats && s.stats.total ? s.stats.total : 0;
-      return `<button class="sess ${s.id === currentSid ? "active" : ""}" data-id="${s.id}">
-        <span class="sess__q">${esc(s.query)}</span>
-        <span class="sess__meta">
-          <span class="pill pill--${s.status}">${STATUS_LABEL[s.status] || s.status}</span>
-          ${total ? `<span class="sess__count">${total}개</span>` : ""}
-        </span>
-      </button>`;
+      return `<div class="sess ${s.id === currentSid ? "active" : ""}" data-id="${s.id}">
+        <div class="sess__main">
+          <span class="sess__q">${esc(s.query)}</span>
+          <span class="sess__meta">
+            <span class="pill pill--${s.status}">${STATUS_LABEL[s.status] || s.status}</span>
+            ${total ? `<span class="sess__count">${total}개</span>` : ""}
+          </span>
+        </div>
+        <button class="sess__del" data-del="${s.id}" title="세션 삭제">✕</button>
+      </div>`;
     })
     .join("");
-  el.querySelectorAll(".sess").forEach((n) =>
-    n.addEventListener("click", () => openSession(parseInt(n.dataset.id)))
+  el.querySelectorAll(".sess__main").forEach((n) =>
+    n.addEventListener("click", () => openSession(parseInt(n.parentNode.dataset.id)))
+  );
+  el.querySelectorAll(".sess__del").forEach((n) =>
+    n.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const id = parseInt(n.dataset.del);
+      if (!confirm("이 세션을 삭제할까요? (상품·리뷰·분석 결과 모두 삭제)")) return;
+      try {
+        await window.api.deleteSession(id);
+        if (id === currentSid) {
+          currentSid = null;
+          renderProducts([]);
+          $("analysis").innerHTML = "";
+          $("log").textContent = "대기 중…";
+        }
+        await refreshSessions();
+      } catch (err) {
+        alert("삭제 실패: " + err.message);
+      }
+    })
   );
 }
 

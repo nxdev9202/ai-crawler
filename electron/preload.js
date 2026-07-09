@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("api", {
   progress: (sid) => req("GET", `/sessions/${sid}/progress`),
   stopSession: (sid) => req("POST", `/sessions/${sid}/stop`),
   listSessions: () => req("GET", "/sessions"),
+  deleteSession: (sid) => req("DELETE", `/sessions/${sid}`),
   getSession: (sid) => req("GET", `/sessions/${sid}`),
   analyze: (sid, prompt) => req("POST", `/sessions/${sid}/analyze`, { prompt }),
   getAccounts: () => req("GET", "/accounts"),

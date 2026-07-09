@@ -87,9 +87,13 @@
 
       .rail__label { font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-faint); padding: 0 6px; }
       .sessions { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; margin: -2px -4px; padding: 2px 4px; }
-      .sess { text-align: left; border: 1px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; border-radius: var(--r-sm); padding: 10px 11px; display: flex; flex-direction: column; gap: 6px; transition: background .12s, border-color .12s; }
+      .sess { border: 1px solid transparent; border-radius: var(--r-sm); display: flex; align-items: center; gap: 6px; transition: background .12s, border-color .12s; }
       .sess:hover { background: var(--panel); }
       .sess.active { background: var(--panel); border-color: var(--border); box-shadow: inset 3px 0 0 var(--accent); }
+      .sess__main { flex: 1; min-width: 0; cursor: pointer; padding: 10px 4px 10px 11px; display: flex; flex-direction: column; gap: 6px; }
+      .sess__del { flex: none; width: 24px; height: 24px; margin-right: 6px; border: none; background: none; color: var(--text-faint); cursor: pointer; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity .12s, background .12s, color .12s; }
+      .sess:hover .sess__del { opacity: 1; }
+      .sess__del:hover { background: rgba(255,111,111,0.15); color: var(--danger); }
       .sess__q { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .sess__meta { display: flex; align-items: center; gap: 7px; }
       .sess__count { font-family: var(--mono); font-size: 11px; color: var(--text-faint); font-variant-numeric: tabular-nums; }

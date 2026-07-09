@@ -298,6 +298,26 @@ async def list_sessions() -> list[dict[str, Any]]:
         ]
 
 
+@app.delete("/sessions/{sid}")
+async def delete_session(sid: int) -> dict[str, Any]:
+    """세션과 그 하위 상품/분석을 삭제. 실행 중이면 먼저 중지."""
+    task = RUNNING_TASKS.get(sid)
+    if task and not task.done():
+        task.cancel()
+    async with SessionLocal() as db:
+        # 하위 레코드 먼저 삭제(SQLite ondelete 미보장 대비) 후 세션 삭제
+        from sqlalchemy import delete as sa_delete
+
+        await db.execute(sa_delete(Product).where(Product.session_id == sid))
+        await db.execute(sa_delete(Analysis).where(Analysis.session_id == sid))
+        sess = await db.get(CrawlSession, sid)
+        if sess:
+            await db.delete(sess)
+        await db.commit()
+    PROGRESS.pop(sid, None)
+    return {"deleted": True}
+
+
 @app.get("/sessions/{sid}")
 async def get_session(sid: int) -> dict[str, Any]:
     async with SessionLocal() as db:
