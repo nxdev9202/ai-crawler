@@ -81,7 +81,15 @@ async def browser_context(session_id: str | None = None):
 
     if use_real and real_chrome_user_data():
         user_data_dir = real_chrome_user_data()
-        extra_args.append(f"--profile-directory={acc.get('chrome_profile') or 'Default'}")
+        extra_args += [
+            f"--profile-directory={acc.get('chrome_profile') or 'Default'}",
+            # 세션 복원/시작페이지/크래시 버블이 크롤을 방해하지 않게
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--hide-crash-restore-bubble",
+            "--disable-session-crashed-bubble",
+            "--disable-features=InfiniteSessionRestore",
+        ]
         inject_cookies = False  # 실제 프로필엔 이미 네이티브 쿠키가 있음
     else:
         user_data_dir = settings.crawl_chrome_user_data_dir or USER_DATA_DIR
@@ -111,6 +119,17 @@ async def browser_context(session_id: str | None = None):
             raise
         context.set_default_navigation_timeout(settings.crawl_nav_timeout_ms)
         context.set_default_timeout(settings.crawl_nav_timeout_ms)
+
+        if use_real:
+            # 실제 프로필은 세션 복원으로 여러 탭이 열릴 수 있음 → 깨끗한 탭 하나만 남김
+            await asyncio.sleep(1.5)
+            fresh = await context.new_page()
+            for pg in list(context.pages):
+                if pg is not fresh:
+                    try:
+                        await pg.close()
+                    except Exception:
+                        pass
 
         if inject_cookies:
             try:
