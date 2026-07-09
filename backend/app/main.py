@@ -304,8 +304,9 @@ async def _run_crawl(session_id: int, query: str, sources: list[str], max_produc
         """
         try:
             analysis = analyze_reviews(entry.get("reviews_json") or [])
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             analysis = {}
+            log(f"[분석] ⚠️ 리뷰 감정분석 실패({entry.get('source')}): {type(e).__name__}: {str(e)[:120]}")
         async with SessionLocal() as db:
             db.add(Product(session_id=session_id, review_analysis=analysis, **entry))
             counts[entry["source"]] = counts.get(entry["source"], 0) + 1

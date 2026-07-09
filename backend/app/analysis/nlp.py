@@ -44,19 +44,24 @@ NEG_WORDS = {
 
 
 def _keywords(reviews: list[dict[str, Any]], topn: int = 25) -> list[list[Any]]:
-    kiwi = _get_kiwi()
-    cnt: Counter[str] = Counter()
+    """핵심 키워드 추출. kiwipiepy 로딩/토크나이즈 실패 시 빈 리스트(감정분석은 유지)."""
     texts = [r.get("content", "") for r in reviews if r.get("content")]
     if not texts:
         return []
-    for tokens in kiwi.tokenize(texts):  # 배치 토크나이즈
-        for tok in tokens:
-            if tok.tag in KEYWORD_TAGS and len(tok.form) > 1:
-                form = tok.form + ("다" if tok.tag.startswith("VA") else "")
-                if form in STOPWORDS or tok.form in STOPWORDS:
-                    continue
-                cnt[form] += 1
-    return [[w, c] for w, c in cnt.most_common(topn)]
+    try:
+        kiwi = _get_kiwi()
+        cnt: Counter[str] = Counter()
+        for tokens in kiwi.tokenize(texts):  # 배치 토크나이즈
+            for tok in tokens:
+                if tok.tag in KEYWORD_TAGS and len(tok.form) > 1:
+                    form = tok.form + ("다" if tok.tag.startswith("VA") else "")
+                    if form in STOPWORDS or tok.form in STOPWORDS:
+                        continue
+                    cnt[form] += 1
+        return [[w, c] for w, c in cnt.most_common(topn)]
+    except Exception:
+        # kiwi가 없거나(번들 누락) 특정 입력에서 실패해도 감정 카운트는 살린다.
+        return []
 
 
 def _sentiment_of(review: dict[str, Any]) -> str:
