@@ -154,8 +154,10 @@ async def crawl(
     results: list[dict[str, Any]] = []
     sid = new_session_id()  # 이 크롤 동안 로그인/익명 컨텍스트가 같은 IP를 쓰도록
 
+    log("[쿠팡] 브라우저 실행 중… (크롬 창이 열립니다)")
     async with browser_context(session_id=sid) as ctx:
         page = ctx.pages[0] if ctx.pages else await ctx.new_page()
+        log("[쿠팡] 브라우저 준비됨. 홈에서 로그인 확인 중…")
         # base에서 실제 크롬의 쿠팡 쿠키(로그인 세션)를 주입함. 홈에서 로그인 확인.
         try:
             await page.goto("https://www.coupang.com/", wait_until="domcontentloaded")

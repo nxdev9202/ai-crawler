@@ -151,6 +151,14 @@ ipcMain.handle("update:check", async () => {
 ipcMain.handle("update:install", () => {
   if (autoUpdater) autoUpdater.quitAndInstall();
 });
+// 진단용: 백엔드 로그가 있는 폴더를 파일 탐색기로 연다.
+ipcMain.handle("app:openLogs", () => {
+  try {
+    return shell.openPath(app.getPath("userData"));
+  } catch (e) {
+    return String((e && e.message) || e);
+  }
+});
 
 app.whenReady().then(() => {
   startBackend();

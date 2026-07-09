@@ -350,8 +350,10 @@ async def crawl(
     results: list[dict[str, Any]] = []
 
     # 크롤 단위 sticky 프록시 세션(프록시 미설정 시 무영향)
+    log("[네이버] 브라우저 실행 중… (크롬 창이 열립니다)")
     async with browser_context(session_id=new_session_id()) as ctx:
         page = ctx.pages[0] if ctx.pages else await ctx.new_page()
+        log("[네이버] 브라우저 준비됨. 로그인 상태 확인 중…")
         # 크롤 전 로그인 확인/로그인
         await _ensure_login(page, log)
         q = urllib.parse.quote(query)

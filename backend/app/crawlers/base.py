@@ -61,6 +61,39 @@ window.chrome = { runtime: {} };
 """
 
 
+def _terminate_chrome_and_unlock(user_data_dir: str) -> None:
+    """실제 프로필 크롤 직전, 남아있는 크롬 프로세스 종료 + 프로필 잠금 파일 제거.
+
+    Windows에서 크롬을 닫아도 백그라운드 프로세스가 프로필을 잡고 있으면 hand-off로
+    크롤러가 프로필을 제어할 수 없다. 실제 프로필 모드는 어차피 사용자가 크롬을 닫아야
+    하므로, 남은 프로세스를 강제 종료하는 것은 안전하다.
+    """
+    import subprocess
+    import sys as _sys
+
+    try:
+        if _sys.platform.startswith("win"):
+            # 백그라운드 포함 모든 chrome.exe 종료(사용자는 크롤 전 크롬을 닫아둔 상태)
+            subprocess.run(
+                ["taskkill", "/F", "/IM", "chrome.exe", "/T"],
+                capture_output=True,
+                timeout=10,
+            )
+        elif _sys.platform == "darwin":
+            subprocess.run(["pkill", "-x", "Google Chrome"], capture_output=True, timeout=10)
+    except Exception:
+        pass
+    # 잠금/싱글턴 파일 제거(다음 실행이 hand-off 없이 프로필을 점유하도록)
+    import time
+
+    time.sleep(1.2)  # 프로세스가 파일 핸들을 놓을 시간
+    for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+        try:
+            os.remove(os.path.join(user_data_dir, name))
+        except Exception:
+            pass
+
+
 @contextlib.asynccontextmanager
 async def browser_context(session_id: str | None = None):
     """로그인 세션이 유지되는 지속(persistent) 브라우저 컨텍스트.
@@ -91,6 +124,11 @@ async def browser_context(session_id: str | None = None):
             "--disable-features=InfiniteSessionRestore",
         ]
         inject_cookies = False  # 실제 프로필엔 이미 네이티브 쿠키가 있음
+        # Windows 핵심 문제: 크롬을 닫아도 백그라운드 프로세스가 프로필을 잡고 있으면,
+        # 크롤러가 같은 프로필로 크롬을 켤 때 Chrome이 "기존 인스턴스로 넘김(hand-off)"을
+        # 하고 크롤러가 띄운 프로세스는 즉시 종료된다. → 조작 불가 about:blank 창만 남음.
+        # 그래서 실제 프로필 실행 직전에 남은 크롬 프로세스와 프로필 잠금을 정리한다.
+        _terminate_chrome_and_unlock(user_data_dir)
     else:
         user_data_dir = settings.crawl_chrome_user_data_dir or USER_DATA_DIR
         if settings.crawl_chrome_profile:

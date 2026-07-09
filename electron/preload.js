@@ -38,4 +38,5 @@ contextBridge.exposeInMainWorld("updater", {
   check: () => ipcRenderer.invoke("update:check"),
   install: () => ipcRenderer.invoke("update:install"),
   onStatus: (cb) => ipcRenderer.on("update:status", (_e, d) => cb(d)),
+  openLogs: () => ipcRenderer.invoke("app:openLogs"),
 });

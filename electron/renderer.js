@@ -494,6 +494,10 @@ async function init() {
       setTimeout(() => ($("updateBtn").disabled = false), 2000);
     }
   });
+  const logBtn = $("logBtn");
+  if (logBtn && window.updater && window.updater.openLogs) {
+    logBtn.addEventListener("click", () => window.updater.openLogs());
+  }
 })();
 
 connectionLoop();
