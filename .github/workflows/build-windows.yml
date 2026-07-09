@@ -1,0 +1,58 @@
+name: Build Windows MSI
+
+# main/master 푸시 또는 수동 실행(Actions 탭 → Run workflow) 시 빌드
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 1) 백엔드를 단일 실행파일로 번들 (PyInstaller)
+      #    channel=chrome(사용자 PC의 Chrome) 사용이라 chromium 다운로드는 불필요
+      - name: Build backend (PyInstaller)
+        working-directory: backend
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python -m pip install --upgrade pip
+          .venv\Scripts\pip install -r requirements.txt
+          .venv\Scripts\pip install pyinstaller
+          .venv\Scripts\pyinstaller ai-crawler-backend.spec
+
+      - name: Check backend bundle
+        working-directory: backend
+        run: |
+          if (-Not (Test-Path "dist\ai-crawler-backend\ai-crawler-backend.exe")) {
+            Write-Error "백엔드 exe 번들 실패"; exit 1
+          }
+
+      # 2) Electron 앱 + MSI 생성 (electron-builder가 백엔드 exe를 동봉)
+      - name: Build Electron MSI
+        working-directory: electron
+        run: |
+          npm install
+          npm run dist
+
+      # 3) MSI 산출물 업로드 (Actions 실행 페이지에서 다운로드)
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI분석크롤러-MSI
+          path: electron/release/*.msi
+          if-no-files-found: error

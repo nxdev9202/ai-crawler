@@ -1,0 +1,277 @@
+"""크롤러 공통 유틸: 브라우저 컨텍스트, 지연, 스펙/리뷰 추출 스크립트."""
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import os
+import random
+from pathlib import Path
+from typing import Any
+
+from playwright.async_api import BrowserContext, Page, async_playwright
+
+from ..config import settings
+
+# 로그인 쿠키/세션을 저장하는 지속 프로필 디렉터리(쓰기 가능한 데이터 폴더).
+from ..paths import userdata_dir
+
+USER_DATA_DIR = userdata_dir()
+
+
+def proxy_kwargs(session_id: str | None = None) -> dict:
+    """설정된 프록시를 Playwright launch 옵션으로 변환.
+
+    PROXY_SERVER가 비어 있으면 빈 dict(프록시 비활성). 로테이팅 프록시에서
+    '크롤 단위 sticky IP'를 쓰려면 PROXY_USERNAME에 `{session}` 토큰을 넣으면 되고,
+    크롤마다 다른 session_id로 치환되어 세션 내 IP 고정 + 크롤 간 IP 변경이 된다.
+    (예: PROXY_USERNAME=user-session-{session})
+    """
+    if not settings.proxy_server:
+        return {}
+    proxy: dict[str, str] = {"server": settings.proxy_server}
+    if settings.proxy_username:
+        user = settings.proxy_username
+        if session_id and "{session}" in user:
+            user = user.replace("{session}", session_id)
+        proxy["username"] = user
+    if settings.proxy_password:
+        proxy["password"] = settings.proxy_password
+    return {"proxy": proxy}
+
+
+def new_session_id() -> str:
+    """크롤 단위 sticky 세션 식별자."""
+    import secrets
+
+    return secrets.token_hex(4)
+
+# 봇 차단 완화를 위한 실사용자 유사 UA
+USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
+
+# navigator.webdriver 등 자동화 흔적 숨기기 (간단 stealth)
+STEALTH_JS = """
+Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+Object.defineProperty(navigator, 'languages', {get: () => ['ko-KR','ko','en-US','en']});
+Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
+window.chrome = { runtime: {} };
+"""
+
+
+@contextlib.asynccontextmanager
+async def browser_context(session_id: str | None = None):
+    """로그인 세션이 유지되는 지속(persistent) 브라우저 컨텍스트.
+
+    - 실제 Google Chrome(channel="chrome")을 사용해 봇 탐지를 줄인다.
+    - USER_DATA_DIR에 쿠키/세션을 저장해 네이버 로그인 상태를 재사용한다.
+    - 네이버는 headless를 차단하므로 기본 headless=False(창 표시)로 동작한다.
+    """
+    # 평소 쓰는 크롬 프로필을 재사용하도록 설정했으면 그 경로를, 아니면 전용 프로필을 사용
+    user_data_dir = settings.crawl_chrome_user_data_dir or USER_DATA_DIR
+    extra_args = ["--disable-blink-features=AutomationControlled"]
+    if settings.crawl_chrome_profile:
+        extra_args.append(f"--profile-directory={settings.crawl_chrome_profile}")
+    if not settings.crawl_chrome_user_data_dir:
+        os.makedirs(USER_DATA_DIR, exist_ok=True)
+
+    async with async_playwright() as p:
+        # 실제 Chrome + 로그인 프로필은 그 자체로 정상 사용자이므로
+        # UA 위조/STEALTH 주입을 하지 않는다(오히려 봇 시그니처로 탐지됨).
+        context = await p.chromium.launch_persistent_context(
+            user_data_dir,
+            headless=settings.crawl_headless,
+            channel="chrome",
+            locale="ko-KR",
+            timezone_id="Asia/Seoul",
+            viewport={"width": 1440, "height": 900},
+            args=extra_args,
+            # '자동화된 소프트웨어' 배너/플래그 제거 → Akamai 등 봇탐지 우회
+            ignore_default_args=["--enable-automation"],
+            **proxy_kwargs(session_id),  # 회사 IP 보호용 프록시(설정 시, sticky)
+        )
+        context.set_default_navigation_timeout(settings.crawl_nav_timeout_ms)
+        context.set_default_timeout(settings.crawl_nav_timeout_ms)
+
+        # 쿠팡: 평소 크롬의 '전체 쿠팡 쿠키(로그인 세션 포함)'를 주입.
+        # login.pang(Akamai)을 거치지 않고 로그인 상태를 재사용 → 리뷰 등 수집 가능.
+        if settings.crawl_use_chrome_cookies:
+            try:
+                from .cookie_sync import get_login_cookies
+
+                cookies = get_login_cookies("coupang.com")
+                if cookies:
+                    await context.add_cookies(cookies)
+            except Exception:
+                pass  # 키체인 거부 등은 무시
+
+        try:
+            yield context
+        finally:
+            await context.close()
+
+
+async def open_persistent(p, headless: bool = False, session_id: str | None = None):
+    """로그인/확인용 지속 컨텍스트. 자동화 배너/플래그 제거 + 스텔스 주입."""
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
+    ctx = await p.chromium.launch_persistent_context(
+        USER_DATA_DIR,
+        headless=headless,
+        channel="chrome",
+        locale="ko-KR",
+        timezone_id="Asia/Seoul",
+        viewport={"width": 1440, "height": 900},
+        args=["--disable-blink-features=AutomationControlled"],
+        ignore_default_args=["--enable-automation"],
+        **proxy_kwargs(session_id),
+    )
+    await ctx.add_init_script(STEALTH_JS)
+    return ctx
+
+
+@contextlib.asynccontextmanager
+async def anonymous_context(session_id: str | None = None):
+    """계정 로그인 없는 별도 컨텍스트(리뷰 API 전용).
+
+    쿠팡 봇우회 쿠키(기기 지문)만 주입하고 계정 쿠키는 넣지 않아, 리뷰 대량 호출을
+    로그인 계정과 분리한다. 프로필을 쓰지 않아(non-persistent) .userdata 잠금과 무관.
+    """
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=settings.crawl_headless,
+            channel="chrome",
+            args=["--disable-blink-features=AutomationControlled"],
+            ignore_default_args=["--enable-automation"],
+            **proxy_kwargs(session_id),
+        )
+        context = await browser.new_context(
+            locale="ko-KR",
+            timezone_id="Asia/Seoul",
+            viewport={"width": 1440, "height": 900},
+        )
+        context.set_default_navigation_timeout(settings.crawl_nav_timeout_ms)
+        context.set_default_timeout(settings.crawl_nav_timeout_ms)
+        await context.add_init_script(STEALTH_JS)
+        try:
+            from .cookie_sync import get_bypass_cookies
+
+            bp = get_bypass_cookies("coupang.com")
+            if bp:
+                await context.add_cookies(bp)
+        except Exception:
+            pass
+        try:
+            yield context
+        finally:
+            await context.close()
+            await browser.close()
+
+
+async def polite_delay() -> None:
+    """요청 간 랜덤 지연."""
+    lo, hi = settings.crawl_min_delay_ms, settings.crawl_max_delay_ms
+    await asyncio.sleep(random.uniform(lo, hi) / 1000.0)
+
+
+async def auto_scroll(page: Page, steps: int = 8, pause_ms: int = 400) -> None:
+    """지연 로딩(lazy-load) 유도를 위해 아래로 스크롤."""
+    for _ in range(steps):
+        await page.mouse.wheel(0, 1600)
+        await page.wait_for_timeout(pause_ms)
+    await page.mouse.wheel(0, -3000)
+    await page.wait_for_timeout(200)
+
+
+# 상세페이지에서 스펙(정의목록/표/라벨값) 후보를 최대한 폭넓게 긁는 스크립트.
+# 사이트마다 구조가 달라서, 흔한 패턴(dl/dt/dd, table th/td, "라벨 : 값")을 모두 시도한다.
+EXTRACT_SPECS_JS = r"""
+() => {
+  const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
+  const pairs = {};
+  const add = (k, v) => {
+    k = clean(k); v = clean(v);
+    if (!k || !v || k.length > 60 || v.length > 400) return;
+    if (!(k in pairs)) pairs[k] = v;
+  };
+
+  // 1) 표 형태 (th/td)
+  document.querySelectorAll('table tr').forEach(tr => {
+    const th = tr.querySelector('th');
+    const td = tr.querySelector('td');
+    if (th && td) add(th.innerText, td.innerText);
+  });
+
+  // 2) 정의목록 (dl > dt/dd)
+  document.querySelectorAll('dl').forEach(dl => {
+    const dts = dl.querySelectorAll('dt');
+    const dds = dl.querySelectorAll('dd');
+    for (let i = 0; i < Math.min(dts.length, dds.length); i++) {
+      add(dts[i].innerText, dds[i].innerText);
+    }
+  });
+
+  // 3) "라벨 : 값" 텍스트 (네이버/쿠팡 스펙 리스트에 흔함)
+  document.querySelectorAll('li, span, p, div').forEach(el => {
+    if (el.children.length > 0) return; // leaf 노드만
+    const t = clean(el.innerText);
+    const m = t.match(/^([가-힣A-Za-z0-9()/\s]{1,30})\s*[:：]\s*(.+)$/);
+    if (m) add(m[1], m[2]);
+  });
+
+  return pairs;
+}
+"""
+
+EXTRACT_REVIEWS_JS = r"""
+(maxN) => {
+  const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
+  const set = new Set();
+  const out = [];
+  const candSel = [
+    '[class*="review"] [class*="content"]',
+    '[class*="review"] [class*="text"]',
+    '[class*="reviewItems"] li',
+    '[class*="reviewList"] li',
+    'article[class*="review"]',
+    '.sdp-review__article__list__review__content',
+  ];
+  for (const sel of candSel) {
+    document.querySelectorAll(sel).forEach(el => {
+      const t = clean(el.innerText);
+      if (t.length >= 8 && t.length <= 800 && !set.has(t)) {
+        set.add(t); out.push(t);
+      }
+    });
+    if (out.length >= maxN) break;
+  }
+  return out.slice(0, maxN);
+}
+"""
+
+
+async def extract_specs(page: Page) -> dict[str, str]:
+    try:
+        data = await page.evaluate(EXTRACT_SPECS_JS)
+        return data or {}
+    except Exception:
+        return {}
+
+
+async def extract_reviews(page: Page, max_n: int = 15) -> list[str]:
+    try:
+        data = await page.evaluate(EXTRACT_REVIEWS_JS, max_n)
+        return data or []
+    except Exception:
+        return []
+
+
+def specs_to_text(title: str, pairs: dict[str, str]) -> str:
+    """스펙 딕셔너리를 사람이 읽는 자연어 문단으로 정리."""
+    if not pairs:
+        return f"{title}: 상세 스펙 정보를 수집하지 못했습니다."
+    parts = [f"'{title}' 상품의 상세 스펙은 다음과 같습니다."]
+    for k, v in pairs.items():
+        parts.append(f"{k}은(는) {v}.")
+    return " ".join(parts)
