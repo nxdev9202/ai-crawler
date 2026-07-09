@@ -81,11 +81,26 @@ def parse_cookies(raw: str) -> list[dict[str, Any]]:
     return out
 
 
+# 크롤 대상 사이트만 저장(전체 export를 붙여넣어도 구글/Gmail 등 다른 세션은 버림 → 프라이버시)
+TARGET_KEYWORDS = ("coupang", "naver")
+
+
+def _is_target(domain: str) -> bool:
+    d = (domain or "").lower()
+    return any(k in d for k in TARGET_KEYWORDS)
+
+
 def save_cookies(raw: str) -> dict[str, Any]:
-    """붙여넣은 쿠키를 정규화해 저장. 반환: {ok, count, domains}."""
-    cookies = parse_cookies(raw)
+    """붙여넣은 쿠키를 정규화 + 쿠팡/네이버만 걸러 저장. 반환: {ok, count, domains}."""
+    parsed = parse_cookies(raw)
+    cookies = [c for c in parsed if _is_target(c.get("domain", ""))]
     if not cookies:
-        return {"ok": False, "count": 0, "domains": [], "error": "유효한 쿠키가 없습니다."}
+        if parsed:
+            return {
+                "ok": False, "count": 0, "domains": {},
+                "error": "쿠팡/네이버 쿠키가 없습니다. 해당 사이트에 로그인 후 그 사이트의 쿠키를 export하세요.",
+            }
+        return {"ok": False, "count": 0, "domains": {}, "error": "유효한 쿠키가 없습니다."}
     COOKIES_FILE.write_text(
         json.dumps(cookies, ensure_ascii=False, indent=2), encoding="utf-8"
     )
