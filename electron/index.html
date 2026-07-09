@@ -230,6 +230,12 @@
       .acct-group input, .acct-group select { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-xs); color: var(--text); font: inherit; padding: 10px 12px; outline: none; transition: border-color .14s; }
       .acct-group input:focus, .acct-group select:focus { border-color: var(--accent); }
       .acct-group select { cursor: pointer; }
+      .switch { position: relative; display: inline-block; width: 40px; height: 22px; cursor: pointer; }
+      .switch input { opacity: 0; width: 0; height: 0; }
+      .switch__sl { position: absolute; inset: 0; background: var(--border); border-radius: 20px; transition: background .15s; }
+      .switch__sl::before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .15s; }
+      .switch input:checked + .switch__sl { background: var(--accent); }
+      .switch input:checked + .switch__sl::before { transform: translateX(18px); }
       .acct-hint { font-size: 11.5px; color: var(--text-dim); line-height: 1.6; background: var(--panel); border: 1px dashed var(--border); border-radius: var(--r-xs); padding: 9px 11px; }
       .acct-hint b { color: var(--text); }
       .login-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-faint); }
@@ -380,7 +386,20 @@
           <h3>크롤링 전용 계정</h3>
           <button class="icon-btn" id="acctClose">✕</button>
         </div>
-        <p class="modal__desc">기업용: 개인 계정 대신 <b>전용 계정</b>을 사용하세요. 크롤링 시작 시 로그인 상태를 확인하고, 미로그인이면 이 계정으로 로그인합니다. (쿠팡은 최초 로그인 시 문자/이메일 2차 인증이 필요할 수 있습니다.)</p>
+        <p class="modal__desc">기업용: 개인 계정 대신 <b>전용 계정</b>을 사용하세요. 크롤링 시작 시 로그인 상태를 확인하고, 미로그인이면 이 계정으로 로그인합니다.</p>
+
+        <div class="acct-group">
+          <div class="acct-group__top">
+            <span class="chip" style="background:#f5b656;color:#04120a">크롬</span>
+            <span class="login-txt" style="margin-left:0">내 크롬 프로필로 크롤링</span>
+            <label class="switch"><input type="checkbox" id="acc_use_real_chrome" /><span class="switch__sl"></span></label>
+          </div>
+          <select id="acc_chrome_profile"></select>
+          <div class="acct-hint">
+            켜면 <b>평소 쓰는 크롬 프로필</b>(쿠팡·네이버 이미 로그인된 상태)로 크롤링해서 봇차단·로그인 문제가 해결됩니다.<br />
+            <b>단, 크롤링 중엔 그 크롬을 완전히 종료</b>해야 합니다(프로필 잠금).
+          </div>
+        </div>
 
         <div class="acct-group">
           <div class="acct-group__top">
@@ -398,11 +417,12 @@
             <span class="chip chip--coupang">쿠팡</span>
             <span class="login-dot" id="dotCoupang" title="로그인 상태"></span>
             <span class="login-txt" id="txtCoupang">확인 전</span>
-            <button class="btn-mini" id="loginCoupang">쿠팡 세션 가져오기</button>
+            <button class="btn-mini" id="loginCoupang">쿠팡 준비</button>
           </div>
           <div class="acct-hint">
-            쿠팡은 봇차단이 강해 <b>평소 쓰는 크롬의 로그인 세션</b>을 가져옵니다.<br />
-            ① 평소 크롬에서 쿠팡 로그인 → ② <b>크롬 완전히 종료</b> → ③ [쿠팡 세션 가져오기] 클릭
+            쿠팡은 봇차단이 강해, <b>열리는 크롬 창에서 직접 잠깐 둘러보면</b> 통과됩니다.<br />
+            [쿠팡 준비] 클릭 → 열린 창에서 <b>상품 몇 개 클릭·스크롤</b>(원하면 로그인) →
+            "준비 완료" 뜨면 끝. 이후 쿠팡 크롤이 됩니다.
           </div>
         </div>
 

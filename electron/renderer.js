@@ -291,6 +291,14 @@ async function openAccounts() {
     setLoginDot("Naver", a.naver_set ? null : false, a.naver_set ? "계정 설정됨" : "계정 없음");
     setLoginDot("Coupang", a.coupang_set ? null : false, a.coupang_set ? "계정 설정됨" : "계정 없음");
     setLoginDot("Gemini", a.gemini_set ? true : false, a.gemini_set ? "키 설정됨 " + (a.gemini_key_hint || "") : "키 없음");
+    // 내 크롬 프로필 토글 + 프로필 목록
+    $("acc_use_real_chrome").checked = !!a.use_real_chrome;
+    const psel = $("acc_chrome_profile");
+    const profs = a.chrome_profiles || [];
+    psel.innerHTML = profs.length
+      ? profs.map((p) => `<option value="${esc(p.dir)}">${esc(p.name)}${p.email ? " · " + esc(p.email) : ""} (${esc(p.dir)})</option>`).join("")
+      : `<option value="Default">Default</option>`;
+    psel.value = a.chrome_profile || "Default";
   } catch (e) {
     $("acctMsg").textContent = "불러오기 실패: " + e.message;
   }
@@ -313,6 +321,8 @@ $("acctSave").addEventListener("click", async () => {
     coupang_pw: $("acc_coupang_pw") ? $("acc_coupang_pw").value : "",
     gemini_api_key: $("acc_gemini_api_key").value.trim(),
     gemini_model: $("acc_gemini_model").value,
+    use_real_chrome: $("acc_use_real_chrome").checked ? "1" : "0",
+    chrome_profile: $("acc_chrome_profile").value || "Default",
   };
   $("acctSave").disabled = true;
   $("acctMsg").textContent = "저장 중…";

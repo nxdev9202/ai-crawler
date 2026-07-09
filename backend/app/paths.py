@@ -28,3 +28,42 @@ def userdata_dir() -> str:
 
 def accounts_file() -> Path:
     return data_dir() / ".accounts.json"
+
+
+def real_chrome_user_data() -> str | None:
+    """사용자가 평소 쓰는 실제 크롬 프로필 폴더(User Data). OS별 자동 감지."""
+    import os
+    import platform
+
+    system = platform.system()
+    if system == "Windows":
+        p = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Google", "Chrome", "User Data")
+    elif system == "Darwin":
+        p = os.path.expanduser("~/Library/Application Support/Google/Chrome")
+    else:
+        p = os.path.expanduser("~/.config/google-chrome")
+    return p if os.path.isdir(p) else None
+
+
+def list_chrome_profiles() -> list[dict]:
+    """실제 크롬의 프로필 목록(디렉터리명 + 표시이름/이메일). Local State에서 읽음."""
+    import json as _json
+
+    base = real_chrome_user_data()
+    if not base:
+        return []
+    out: list[dict] = []
+    try:
+        ls = _json.loads((Path(base) / "Local State").read_text(encoding="utf-8"))
+        cache = ls.get("profile", {}).get("info_cache", {})
+        for dir_name, info in cache.items():
+            out.append(
+                {
+                    "dir": dir_name,
+                    "name": info.get("name") or dir_name,
+                    "email": info.get("user_name") or "",
+                }
+            )
+    except Exception:
+        pass
+    return out

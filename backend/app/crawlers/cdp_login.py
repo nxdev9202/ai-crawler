@@ -177,6 +177,70 @@ async def import_coupang_session(on_progress: Callable[[str], None] | None = Non
     return {"ok": True, "count": len(coupang_cookies), "logged_in": logged}
 
 
+async def prepare_coupang_session(
+    on_progress: Callable[[str], None] | None = None, wait_seconds: int = 300
+) -> dict:
+    """크롤러 자체 크롬 창을 열어 사용자가 쿠팡을 직접 둘러보게 한다.
+
+    사람의 실제 마우스·스크롤이 Akamai 봇검사(_abck)를 통과시키고, 그 세션이
+    크롤러 프로필(.userdata)에 저장된다. 쿠키 추출/login.pang 불필요 → Windows에서도 동작.
+    로그인까지 하면 로그인 세션도 함께 저장된다.
+    """
+    log = on_progress or (lambda _m: None)
+    _clear_locks()
+    ok = False
+    logged = False
+    from .base import open_persistent
+
+    async with async_playwright() as p:
+        ctx = await open_persistent(p, headless=False)
+        try:
+            page = ctx.pages[0] if ctx.pages else await ctx.new_page()
+            await page.goto("https://www.coupang.com/", wait_until="domcontentloaded")
+            await page.wait_for_timeout(2000)
+            log(
+                "[쿠팡] 창이 열렸습니다. 그 창에서 상품 몇 개를 둘러보세요(스크롤·클릭). "
+                "필요하면 로그인도 하세요. 준비되면 자동 감지합니다. (최대 5분)"
+            )
+            for _ in range(wait_seconds // 6):
+                await page.wait_for_timeout(6000)
+                if page.is_closed():
+                    break
+                try:
+                    logged = "로그아웃" in (await page.inner_text("body"))
+                except Exception:
+                    break
+                # 검색이 통과되는지(=Akamai 통과) 백그라운드 탭으로 확인
+                try:
+                    test = await ctx.new_page()
+                    await test.goto(
+                        "https://www.coupang.com/np/search?q=%EC%8B%9D%EC%9A%A9%EC%9C%A0&channel=user",
+                        wait_until="domcontentloaded",
+                    )
+                    await test.wait_for_timeout(2500)
+                    tb = await test.inner_text("body")
+                    n = await test.locator(
+                        'li.search-product, ul#productList > li, li[class*="ProductUnit"]'
+                    ).count()
+                    await test.close()
+                    if "Access Denied" not in tb and n > 0:
+                        ok = True
+                        log(
+                            f"[쿠팡] 준비 완료 — 검색 정상(상품 {n}개)"
+                            f"{' · 로그인됨' if logged else ''}. 이제 크롤링하시면 됩니다."
+                        )
+                        break
+                    log("[쿠팡] 아직 봇차단 상태… 창에서 상품을 몇 개 더 둘러봐 주세요.")
+                except Exception:
+                    pass
+        finally:
+            try:
+                await ctx.close()
+            except Exception:
+                pass
+    return {"ok": ok, "logged_in": logged}
+
+
 def _clear_locks() -> None:
     for f in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
         try:

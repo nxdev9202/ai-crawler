@@ -116,13 +116,13 @@ async def _run_login(site: str) -> None:
 
     try:
         if site == "coupang":
-            # 쿠팡: 사용자 실제 크롬에서 쿠키를 가져와 .userdata에 주입(ABE 우회, Windows 대응)
-            from .crawlers.cdp_login import import_coupang_session
+            # 쿠팡: 크롤러 크롬 창을 열어 사용자가 직접 둘러보며 Akamai 통과(Windows 대응)
+            from .crawlers.cdp_login import prepare_coupang_session
 
-            r = await import_coupang_session(on_progress=log)
+            r = await prepare_coupang_session(on_progress=log)
+            st["logged_in"] = bool(r.get("ok") or r.get("logged_in"))
             if not r.get("ok"):
-                log(f"[쿠팡세션] 실패: {r.get('error')}")
-            st["logged_in"] = bool(r.get("logged_in"))
+                log("[쿠팡] 준비 미완료 — 창에서 상품을 더 둘러본 뒤 다시 시도하세요.")
         else:
             # 네이버: 진짜 Chrome + CDP로 로그인. 세션은 .userdata에 저장됨.
             from .crawlers.cdp_login import login_via_cdp

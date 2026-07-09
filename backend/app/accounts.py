@@ -20,6 +20,8 @@ FIELDS = (
     "coupang_pw",
     "gemini_api_key",
     "gemini_model",
+    "use_real_chrome",   # "1"이면 크롤러가 사용자 실제 크롬 프로필로 동작
+    "chrome_profile",    # 실제 크롬 프로필 디렉터리(예: Default, "Profile 1")
 )
 
 
@@ -32,6 +34,8 @@ def get_accounts() -> dict[str, str]:
         "coupang_pw": settings.coupang_pw or "",
         "gemini_api_key": settings.google_api_key or "",
         "gemini_model": settings.gemini_model or "gemini-3.5-flash",
+        "use_real_chrome": "",
+        "chrome_profile": "Default",
     }
     if ACCOUNTS_FILE.exists():
         try:
@@ -75,7 +79,19 @@ def masked_status() -> dict[str, Any]:
         "gemini_set": bool(key),
         "gemini_key_hint": ("…" + key[-4:]) if key else "",
         "gemini_model": acc.get("gemini_model") or "gemini-3.5-flash",
+        "use_real_chrome": acc.get("use_real_chrome") == "1",
+        "chrome_profile": acc.get("chrome_profile") or "Default",
+        "chrome_profiles": _list_profiles(),
     }
+
+
+def _list_profiles() -> list:
+    from .paths import list_chrome_profiles
+
+    try:
+        return list_chrome_profiles()
+    except Exception:
+        return []
 
 
 def get_gemini_config() -> dict[str, str]:

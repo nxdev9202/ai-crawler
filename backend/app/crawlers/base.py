@@ -69,35 +69,50 @@ async def browser_context(session_id: str | None = None):
     - USER_DATA_DIR에 쿠키/세션을 저장해 네이버 로그인 상태를 재사용한다.
     - 네이버는 headless를 차단하므로 기본 headless=False(창 표시)로 동작한다.
     """
-    # 평소 쓰는 크롬 프로필을 재사용하도록 설정했으면 그 경로를, 아니면 전용 프로필을 사용
-    user_data_dir = settings.crawl_chrome_user_data_dir or USER_DATA_DIR
+    # 프로필 결정: "내 크롬 프로필 사용" 토글이 켜져 있으면 사용자 실제 크롬 프로필로 엶
+    # (쿠팡/네이버 모두 이미 로그인된 상태 → 쿠키 추출·ABE 문제 없음. 단 크롬은 종료 필요)
+    from ..accounts import get_accounts
+    from ..paths import real_chrome_user_data
+
+    acc = get_accounts()
+    use_real = acc.get("use_real_chrome") == "1"
     extra_args = ["--disable-blink-features=AutomationControlled"]
-    if settings.crawl_chrome_profile:
-        extra_args.append(f"--profile-directory={settings.crawl_chrome_profile}")
-    if not settings.crawl_chrome_user_data_dir:
-        os.makedirs(USER_DATA_DIR, exist_ok=True)
+    inject_cookies = settings.crawl_use_chrome_cookies
+
+    if use_real and real_chrome_user_data():
+        user_data_dir = real_chrome_user_data()
+        extra_args.append(f"--profile-directory={acc.get('chrome_profile') or 'Default'}")
+        inject_cookies = False  # 실제 프로필엔 이미 네이티브 쿠키가 있음
+    else:
+        user_data_dir = settings.crawl_chrome_user_data_dir or USER_DATA_DIR
+        if settings.crawl_chrome_profile:
+            extra_args.append(f"--profile-directory={settings.crawl_chrome_profile}")
+        if not settings.crawl_chrome_user_data_dir:
+            os.makedirs(USER_DATA_DIR, exist_ok=True)
 
     async with async_playwright() as p:
-        # 실제 Chrome + 로그인 프로필은 그 자체로 정상 사용자이므로
-        # UA 위조/STEALTH 주입을 하지 않는다(오히려 봇 시그니처로 탐지됨).
-        context = await p.chromium.launch_persistent_context(
-            user_data_dir,
-            headless=settings.crawl_headless,
-            channel="chrome",
-            locale="ko-KR",
-            timezone_id="Asia/Seoul",
-            viewport={"width": 1440, "height": 900},
-            args=extra_args,
-            # '자동화된 소프트웨어' 배너/플래그 제거 → Akamai 등 봇탐지 우회
-            ignore_default_args=["--enable-automation"],
-            **proxy_kwargs(session_id),  # 회사 IP 보호용 프록시(설정 시, sticky)
-        )
+        try:
+            context = await p.chromium.launch_persistent_context(
+                user_data_dir,
+                headless=settings.crawl_headless,
+                channel="chrome",
+                locale="ko-KR",
+                timezone_id="Asia/Seoul",
+                viewport={"width": 1440, "height": 900},
+                args=extra_args,
+                ignore_default_args=["--enable-automation"],
+                **proxy_kwargs(session_id),
+            )
+        except Exception as e:
+            if use_real:
+                raise RuntimeError(
+                    "크롬 프로필을 열 수 없습니다. 평소 쓰는 Chrome을 완전히 종료한 뒤 다시 시도하세요."
+                ) from e
+            raise
         context.set_default_navigation_timeout(settings.crawl_nav_timeout_ms)
         context.set_default_timeout(settings.crawl_nav_timeout_ms)
 
-        # 쿠팡: 평소 크롬의 '전체 쿠팡 쿠키(로그인 세션 포함)'를 주입.
-        # login.pang(Akamai)을 거치지 않고 로그인 상태를 재사용 → 리뷰 등 수집 가능.
-        if settings.crawl_use_chrome_cookies:
+        if inject_cookies:
             try:
                 from .cookie_sync import get_login_cookies
 
@@ -105,7 +120,7 @@ async def browser_context(session_id: str | None = None):
                 if cookies:
                     await context.add_cookies(cookies)
             except Exception:
-                pass  # 키체인 거부 등은 무시
+                pass
 
         try:
             yield context
