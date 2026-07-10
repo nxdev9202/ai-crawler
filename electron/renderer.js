@@ -5,6 +5,70 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => (s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/* ===== 안전한 마크다운 → HTML (모델 출력용) =====
+   먼저 전부 HTML escape → 그 위에 마크다운 문법만 적용하므로 원문 HTML/스크립트 주입 불가. */
+function mdInline(s) {
+  // s는 이미 escape된 상태
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+  s = s.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return s;
+}
+function mdToHtml(src) {
+  const lines = esc(src || "").replace(/\r\n/g, "\n").split("\n");
+  const out = [];
+  let para = [], list = null, listItems = [], inCode = false, code = [];
+  const flushPara = () => { if (para.length) { out.push("<p>" + mdInline(para.join(" ")) + "</p>"); para = []; } };
+  const flushList = () => { if (listItems.length) { out.push(`<${list}>` + listItems.map((li) => "<li>" + mdInline(li) + "</li>").join("") + `</${list}>`); listItems = []; list = null; } };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // 코드펜스 ```
+    if (/^\s*```/.test(line)) {
+      if (inCode) { out.push("<pre><code>" + code.join("\n") + "</code></pre>"); code = []; inCode = false; }
+      else { flushPara(); flushList(); inCode = true; }
+      continue;
+    }
+    if (inCode) { code.push(line); continue; }
+    // 표: | a | b | 다음 줄이 |---|---|
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1]) && lines[i + 1].includes("-")) {
+      flushPara(); flushList();
+      const cell = (r) => r.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+      const head = cell(line);
+      let j = i + 2, rows = [];
+      while (j < lines.length && /^\s*\|.*\|\s*$/.test(lines[j])) { rows.push(cell(lines[j])); j++; }
+      let t = "<table><thead><tr>" + head.map((h) => "<th>" + mdInline(h) + "</th>").join("") + "</tr></thead><tbody>";
+      t += rows.map((r) => "<tr>" + r.map((c) => "<td>" + mdInline(c) + "</td>").join("") + "</tr>").join("");
+      t += "</tbody></table>";
+      out.push(t); i = j - 1; continue;
+    }
+    // 제목
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { flushPara(); flushList(); const lv = h[1].length + 1; out.push(`<h${lv}>` + mdInline(h[2]) + `</h${lv}>`); continue; }
+    // 수평선
+    if (/^\s*([-*_])\1{2,}\s*$/.test(line)) { flushPara(); flushList(); out.push("<hr>"); continue; }
+    // 인용 (escape 후라 '>'는 '&gt;'로 바뀌어 있음)
+    const bq = line.match(/^\s*&gt;\s?(.*)$/);
+    if (bq) { flushPara(); flushList(); out.push("<blockquote>" + mdInline(bq[1]) + "</blockquote>"); continue; }
+    // 목록
+    const ul = line.match(/^\s*[-*+]\s+(.*)$/);
+    const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (ul || ol) {
+      flushPara();
+      const type = ul ? "ul" : "ol";
+      if (list && list !== type) flushList();
+      list = type; listItems.push((ul || ol)[1]); continue;
+    }
+    // 빈 줄 → 문단 구분
+    if (/^\s*$/.test(line)) { flushPara(); flushList(); continue; }
+    // 일반 텍스트
+    flushList(); para.push(line);
+  }
+  if (inCode) out.push("<pre><code>" + code.join("\n") + "</code></pre>");
+  flushPara(); flushList();
+  return out.join("");
+}
+
 /* ===== NumberFlow식 롤링 카운터 ===== */
 function animateNumber(el, to, suffix = "") {
   if (!el) return;
@@ -190,7 +254,7 @@ async function openSession(sid) {
   animateNumber($("cntCoupang"), products.filter((p) => p.source === "coupang").length);
   setRunState(s.status);
   $("analysis").innerHTML = s.analyses && s.analyses.length
-    ? `<div class="analysis">${esc(s.analyses[0].result_text)}</div>`
+    ? `<div class="analysis">${mdToHtml(s.analyses[0].result_text)}</div>`
     : "";
   if (s.status === "running") startPolling(sid);
 }
@@ -264,7 +328,7 @@ $("analyzeBtn").addEventListener("click", async () => {
   $("analyzeStatus").textContent = "Gemini 분석 중…";
   try {
     const r = await window.api.analyze(currentSid, prompt || null);
-    $("analysis").innerHTML = `<div class="analysis">${esc(r.result_text)}</div>`;
+    $("analysis").innerHTML = `<div class="analysis">${mdToHtml(r.result_text)}</div>`;
     $("analyzeStatus").textContent = `완료 · ${r.model}`;
   } catch (e) {
     $("analyzeStatus").textContent = "분석 실패: " + e.message;

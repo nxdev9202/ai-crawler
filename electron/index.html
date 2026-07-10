@@ -219,7 +219,26 @@
       .analysis-actions { display: flex; align-items: center; gap: 12px; }
       #analyzeStatus { font-size: 12px; color: var(--text-faint); }
       #analysis:empty { display: none; }
-      .analysis { background: linear-gradient(180deg, var(--panel), var(--panel)); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--r); padding: 18px 20px; white-space: pre-wrap; line-height: 1.78; font-size: 13.5px; box-shadow: var(--shadow-sm); animation: rise .32s ease both; }
+      .analysis { background: linear-gradient(180deg, var(--panel), var(--panel)); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--r); padding: 20px 24px; line-height: 1.8; font-size: 15.5px; box-shadow: var(--shadow-sm); animation: rise .32s ease both; }
+      .analysis > *:first-child { margin-top: 0; }
+      .analysis > *:last-child { margin-bottom: 0; }
+      .analysis p { margin: 0 0 12px; }
+      .analysis h2 { font-size: 20px; margin: 22px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border-soft); }
+      .analysis h3 { font-size: 17.5px; margin: 20px 0 10px; color: var(--accent); }
+      .analysis h4 { font-size: 15.5px; margin: 16px 0 8px; }
+      .analysis ul, .analysis ol { margin: 0 0 12px; padding-left: 24px; }
+      .analysis li { margin: 5px 0; }
+      .analysis strong { color: var(--text); font-weight: 700; }
+      .analysis code { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 5px; padding: 1px 6px; font-size: 0.9em; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+      .analysis pre { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 12px 14px; overflow-x: auto; margin: 0 0 12px; }
+      .analysis pre code { background: none; border: 0; padding: 0; }
+      .analysis blockquote { margin: 0 0 12px; padding: 6px 14px; border-left: 3px solid var(--border); color: var(--text-dim); }
+      .analysis hr { border: 0; border-top: 1px solid var(--border-soft); margin: 18px 0; }
+      .analysis a { color: var(--accent); }
+      .analysis table { border-collapse: collapse; width: 100%; margin: 0 0 14px; font-size: 14px; display: block; overflow-x: auto; }
+      .analysis th, .analysis td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
+      .analysis th { background: var(--panel-2); font-weight: 700; }
+      .analysis tbody tr:nth-child(even) { background: var(--panel-2); }
 
       /* 계정 모달 */
       .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 50; backdrop-filter: blur(3px); }
