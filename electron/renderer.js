@@ -609,6 +609,7 @@ async function connectionLoop() {
       await init(); // 연결되면 세션 로드
       refreshHealth();
       setInterval(refreshHealth, 5000);
+      maybeShowPatchNotes(); // 업데이트 후 '새로워진 점' 표시
       return;
     } catch {
       if (bootMsg && tries > 6) bootMsg.textContent = "백엔드 연결 대기 중… (백신 검사로 지연될 수 있음)";
@@ -630,6 +631,49 @@ async function init() {
     await refreshSessions();
   }
 }
+
+/* ===== 패치노트(업데이트 후 '새로워진 점') ===== */
+function cmpVer(a, b) {
+  const pa = String(a).split(".").map(Number), pb = String(b).split(".").map(Number);
+  for (let i = 0; i < 3; i++) { const d = (pa[i] || 0) - (pb[i] || 0); if (d) return d; }
+  return 0;
+}
+function renderPatch(entries) {
+  $("patchBody").innerHTML = entries
+    .map((e) => `<div class="patch-ver">
+      <div class="patch-ver__head">
+        <span class="patch-ver__v">v${esc(e.version)}</span>
+        <span class="patch-ver__t">${esc(e.title || "")}</span>
+        <span class="patch-ver__d">${esc(e.date || "")}</span>
+      </div>
+      <ul>${(e.items || []).map((it) => `<li>${esc(it)}</li>`).join("")}</ul>
+    </div>`)
+    .join("");
+}
+async function maybeShowPatchNotes() {
+  if (!window.updater || !window.CHANGELOG) return;
+  let ver;
+  try { ver = await window.updater.version(); } catch { return; }
+  if (!ver) return;
+  const last = localStorage.getItem("lastSeenVersion");
+  // 첫 설치(기록 없음)는 조용히 기록만 하고 표시하지 않음
+  if (!last) { localStorage.setItem("lastSeenVersion", ver); return; }
+  if (cmpVer(ver, last) <= 0) return; // 새 버전 아님
+  const entries = window.CHANGELOG
+    .filter((e) => cmpVer(e.version, last) > 0 && cmpVer(e.version, ver) <= 0)
+    .sort((a, b) => cmpVer(b.version, a.version));
+  localStorage.setItem("lastSeenVersion", ver);
+  if (!entries.length) return;
+  renderPatch(entries);
+  $("patchModal").classList.add("open");
+}
+(() => {
+  const close = () => $("patchModal").classList.remove("open");
+  const pc = $("patchClose"), po = $("patchOk"), pm = $("patchModal");
+  if (pc) pc.addEventListener("click", close);
+  if (po) po.addEventListener("click", close);
+  if (pm) pm.addEventListener("click", (e) => { if (e.target === pm) close(); });
+})();
 
 /* ===== 앱 업데이트 UI ===== */
 (async () => {

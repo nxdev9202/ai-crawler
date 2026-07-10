@@ -28,7 +28,8 @@
       "main.js",
       "preload.js",
       "index.html",
-      "renderer.js"
+      "renderer.js",
+      "changelog.js"
     ],
     "extraResources": [
       {

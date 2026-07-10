@@ -282,6 +282,15 @@
       .tab-panel { display: none; flex-direction: column; gap: 12px; }
       .tab-panel.active { display: flex; animation: fade .16s ease; }
       .modal--tabs .modal__actions { padding: 13px 20px; border-top: 1px solid var(--border-soft); }
+      /* 패치노트 */
+      .patch-body { overflow-y: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 16px; }
+      .patch-ver { }
+      .patch-ver__head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+      .patch-ver__v { font-weight: 800; font-size: 15px; color: var(--accent); }
+      .patch-ver__t { font-size: 13.5px; color: var(--text); font-weight: 600; }
+      .patch-ver__d { font-size: 11.5px; color: var(--text-faint); margin-left: auto; }
+      .patch-ver ul { margin: 0; padding-left: 20px; }
+      .patch-ver li { margin: 5px 0; font-size: 13.5px; line-height: 1.6; color: var(--text-dim); }
 
       /* 부팅 오버레이 */
       .boot { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--bg); transition: opacity .35s ease; }
@@ -547,6 +556,20 @@
       </div>
     </div>
 
+    <!-- 패치노트(업데이트 후) 모달 -->
+    <div class="modal-backdrop" id="patchModal">
+      <div class="modal" style="width:520px;max-width:92vw;max-height:82vh;">
+        <div class="modal__head">
+          <h3>🎉 새로워진 점</h3>
+          <button class="icon-btn" id="patchClose">✕</button>
+        </div>
+        <div id="patchBody" class="patch-body"></div>
+        <div class="modal__actions" style="justify-content:flex-end">
+          <button class="btn btn--primary" id="patchOk">확인</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       // 테마 토글 (다크 기본)
       (function () {
@@ -560,6 +583,7 @@
         });
       })();
     </script>
+    <script src="changelog.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>
