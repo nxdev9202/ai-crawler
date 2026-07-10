@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        width: 300px;
+        margin: 0;
+        padding: 16px;
+        font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+        background: #12151c;
+        color: #e6e8ee;
+      }
+      .brand {
+        display: flex; align-items: center; gap: 8px;
+        font-weight: 700; font-size: 15px; margin-bottom: 4px;
+      }
+      .brand .nx {
+        background: #f5b656; color: #04120a; font-weight: 800;
+        padding: 1px 6px; border-radius: 5px; font-size: 13px;
+      }
+      .sub { font-size: 11.5px; color: #9aa2b1; margin-bottom: 14px; line-height: 1.5; }
+      button {
+        width: 100%; padding: 10px; margin-bottom: 8px;
+        border: 0; border-radius: 8px; cursor: pointer;
+        font-size: 13.5px; font-weight: 600; color: #fff;
+      }
+      .b-cp { background: #2c5cff; }
+      .b-nv { background: #16a34a; }
+      .b-all { background: #7c5cff; }
+      button:disabled { opacity: .5; cursor: default; }
+      .status {
+        margin-top: 6px; font-size: 12px; line-height: 1.5;
+        min-height: 34px; padding: 8px; border-radius: 7px;
+        background: #1b1f29; white-space: pre-wrap;
+      }
+      .ok { color: #4ade80; }
+      .err { color: #f87171; }
+      .adv { margin-top: 12px; font-size: 11px; color: #7c8492; }
+      .adv input {
+        width: 70px; background: #1b1f29; border: 1px solid #2a2f3a;
+        color: #e6e8ee; border-radius: 5px; padding: 3px 6px; font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="brand"><span class="nx">NX</span> 쿠키 전송</div>
+    <div class="sub">
+      쿠팡·네이버에 <b>로그인된 상태</b>에서 아래 버튼을 누르면, 그 사이트 세션이
+      NX 크롤러로 바로 전송됩니다. (NX 앱이 켜져 있어야 합니다)
+    </div>
+
+    <button class="b-cp" data-site="coupang">🛒 쿠팡 세션 전송</button>
+    <button class="b-nv" data-site="naver">🟢 네이버 세션 전송</button>
+    <button class="b-all" data-site="all">📦 쿠팡 + 네이버 모두 전송</button>
+
+    <div class="status" id="status">준비됨.</div>
+
+    <div class="adv">
+      NX 앱 포트: <input id="port" type="text" value="8756" />
+      <span style="opacity:.7">(기본 8756, 바꾸지 마세요)</span>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
