@@ -343,6 +343,18 @@ function setLoginDot(site, on, txt) {
 }
 $("acctBtn").addEventListener("click", openAccounts);
 $("acctClose").addEventListener("click", () => acctModal.classList.remove("open"));
+// 설정 탭 전환
+document.querySelectorAll(".modal__nav .tab-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll(".modal__nav .tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
+    document.querySelectorAll(".modal__body .tab-panel").forEach((p) =>
+      p.classList.toggle("active", p.dataset.panel === tab)
+    );
+    const body = document.querySelector(".modal__body");
+    if (body) body.scrollTop = 0;
+  });
+});
 acctModal.addEventListener("click", (e) => {
   if (e.target === acctModal) acctModal.classList.remove("open");
 });
