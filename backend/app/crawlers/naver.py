@@ -173,6 +173,44 @@ async ([merchant, origin, target]) => {
 """
 
 
+# 가격비교(카탈로그) 리뷰: 페이지가 실제로 호출하는 review API를 인터셉트해 재사용.
+# reviewType=ALL로 바꿔 전체 리뷰를 page 증가로 수집(20/page). data.reviews[], data.totalCount.
+JS_FETCH_CATALOG_REVIEWS = r"""
+async ([capUrl, target]) => {
+  const u = new URL(capUrl);
+  u.searchParams.set('reviewType', 'ALL');
+  u.searchParams.set('sort', 'QUALITY');
+  const strip = (s) => (s || '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+  const out = { reviews: [], total: null };
+  const maxPages = Math.ceil(target / 20);
+  for (let p = 1; p <= maxPages; p++) {
+    u.searchParams.set('page', p);
+    let j;
+    try {
+      const r = await fetch(u.toString(), { headers: { 'accept': 'application/json' } });
+      if (r.status !== 200) break;
+      j = await r.json();
+    } catch (e) { break; }
+    const d = j.data || {};
+    if (out.total === null) out.total = (d.totalCount != null ? d.totalCount : null);
+    const revs = d.reviews || [];
+    for (const it of revs) {
+      const c = strip(it.content);
+      if (c) out.reviews.push({ score: it.starScore, content: c, date: (it.registerDate || '').slice(0, 10) });
+    }
+    if (revs.length < 20 || out.reviews.length >= target) break;
+    await new Promise((res) => setTimeout(res, 220));
+  }
+  return out;
+}
+"""
+
+
 def _find_merchant(prod: dict[str, Any]) -> int | None:
     s = json.dumps(prod)
     for key in ("checkoutMerchantNo", "merchantNo", "payReferenceKey"):
@@ -184,7 +222,7 @@ def _find_merchant(prod: dict[str, Any]) -> int | None:
 
 async def _crawl_smartstore_detail(detail: Page, url: str, entry: dict[str, Any]) -> bool:
     """스마트스토어/브랜드스토어: 상품 API 가로채기 + 리뷰 API 직접 호출."""
-    captured: dict[str, Any] = {"product": None, "review_body": None}
+    captured: dict[str, Any] = {"product": None, "review_body": None, "catalog_review_url": None}
 
     async def on_resp(resp) -> None:
         u = resp.url
@@ -199,6 +237,9 @@ async def _crawl_smartstore_detail(detail: Page, url: str, entry: dict[str, Any]
         # 리뷰 위젯이 스크롤로 로드될 때 나가는 첫 요청에서 merchant/origin 확보
         if "reviews/query-pages" in req.url and req.method == "POST" and not captured["review_body"]:
             captured["review_body"] = req.post_data
+        # 가격비교(카탈로그) 리뷰 API 인터셉트
+        if "/catalog/api/" in req.url and "/reviews" in req.url and not captured["catalog_review_url"]:
+            captured["catalog_review_url"] = req.url
 
     detail.on("response", on_resp)
     detail.on("request", on_req)
@@ -214,6 +255,29 @@ async def _crawl_smartstore_detail(detail: Page, url: str, entry: dict[str, Any]
 
     prod = captured["product"]
     if not prod:
+        # 가격비교(카탈로그) 페이지: 카탈로그 리뷰 API로 전체 리뷰 수집
+        if captured["catalog_review_url"]:
+            entry["url"] = product_url
+            # 스펙은 DOM에서(카탈로그 스펙표), 판매자/법적 노이즈 제거
+            pairs = await extract_specs(detail)
+            pairs = {k: v for k, v in pairs.items() if not any(t in k for t in NOISE_KEY_TOKENS)}
+            entry["spec_json"] = pairs
+            entry["spec_text"] = _spec_text_from_pairs(entry["title"], pairs)
+            try:
+                r = await detail.evaluate(
+                    JS_FETCH_CATALOG_REVIEWS, [captured["catalog_review_url"], settings.review_max]
+                )
+            except Exception:
+                r = {"reviews": [], "total": None}
+            entry["reviews_json"] = r.get("reviews") or []
+            if r.get("total") is not None:
+                entry["review_count"] = str(r["total"])
+            entry["raw_json"]["catalog_review"] = {
+                "url": captured["catalog_review_url"],
+                "total": r.get("total"),
+                "fetched": len(entry["reviews_json"]),
+            }
+            return True
         return False
 
     entry["url"] = product_url
