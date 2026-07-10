@@ -159,6 +159,17 @@ ipcMain.handle("app:openLogs", () => {
     return String((e && e.message) || e);
   }
 });
+// "NX 쿠키 전송" 확장 폴더를 연다(chrome://extensions에서 압축해제 로드용).
+ipcMain.handle("app:openExtension", () => {
+  try {
+    const dir = app.isPackaged
+      ? path.join(process.resourcesPath, "extension")
+      : path.join(__dirname, "..", "extension");
+    return shell.openPath(dir);
+  } catch (e) {
+    return String((e && e.message) || e);
+  }
+});
 
 app.whenReady().then(() => {
   startBackend();

@@ -34,6 +34,10 @@
       {
         "from": "../backend/dist/ai-crawler-backend",
         "to": "backend"
+      },
+      {
+        "from": "../extension",
+        "to": "extension"
       }
     ],
     "publish": {

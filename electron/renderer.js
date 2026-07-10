@@ -419,6 +419,10 @@ $("cookieSave").addEventListener("click", async () => {
     $("cookieSave").disabled = false;
   }
 });
+const openExtBtn = $("openExtBtn");
+if (openExtBtn && window.updater && window.updater.openExtension) {
+  openExtBtn.addEventListener("click", () => window.updater.openExtension());
+}
 $("cookieClear").addEventListener("click", async () => {
   try {
     await window.api.clearCookies();
