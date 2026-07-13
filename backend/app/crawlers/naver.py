@@ -211,6 +211,25 @@ async ([capUrl, target]) => {
 """
 
 
+# marketing-message(최근 구매수 "N명 구매")를 인터셉트 못 했을 때 상품 ID로 직접 호출.
+# 스마트스토어는 /i/v1/, 브랜드스토어(brand.naver)는 /n/v1/ 경로라 둘 다 시도한다.
+JS_FETCH_MARKETING = r"""
+async ([pid, reviewCount]) => {
+  // basisPurchased=1: 페이지 기본 임계값(10)에 가려진 소량 구매도 가져와 커버리지를 넓힘
+  const qs = `?currentPurchaseType=Paid&reviewCount=${reviewCount}&usePurchased=true&basisPurchased=1`;
+  for (const base of ['/i/v1/marketing-message/', '/n/v1/marketing-message/']) {
+    try {
+      const r = await fetch(`${base}${pid}${qs}`, { headers: { 'accept': 'application/json' } });
+      if (r.status !== 200) continue;
+      const j = await r.json();
+      if (j && (j.mainPhrase || '').trim()) return j;
+    } catch (e) {}
+  }
+  return null;
+}
+"""
+
+
 def _parse_weekly_sales(marketing: dict[str, Any] | None) -> tuple[str | None, int | None]:
     """marketing-message 응답 → ('최근 1주간 N명 구매', N). 네이버 공식 노출 수치."""
     if not marketing:
@@ -228,6 +247,22 @@ def _combo_name(c: dict[str, Any]) -> str:
     return " / ".join(str(n) for n in names if n)
 
 
+def _clean_option_name(s: str) -> str:
+    """리뷰의 productOptionContent에서 판매자 옵션그룹명(라벨/프로모문구)을 떼고 값만 남긴다.
+
+    예) '선택하신 옵션으로 발송됩니다.: [1박스/90정] 종합' → '[1박스/90정] 종합'
+        '5개 이상 구매시 2000원 추가할인: [1박스/90정]' → '[1박스/90정]'
+        '컬러: 블랙' → '블랙'
+    같은 옵션값이 여러 프로모 그룹에 걸쳐 있어도 값 기준으로 합쳐진다.
+    """
+    s = (s or "").strip()
+    # 맨 앞 '그룹명: ' 라벨 제거(값 안의 ':'는 보통 첫 콜론 이후이므로 첫 콜론만)
+    m = re.match(r"^[^:]{1,45}:\s*(.+)$", s)
+    if m:
+        s = m.group(1).strip()
+    return s
+
+
 def _build_sales_info(
     marketing: dict[str, Any] | None, prod: dict[str, Any] | None, reviews: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -235,7 +270,9 @@ def _build_sales_info(
     from collections import Counter
 
     text, cnt = _parse_weekly_sales(marketing)
-    opt_counts = Counter((r.get("option") or "").strip() for r in reviews if (r.get("option") or "").strip())
+    opt_counts = Counter(
+        _clean_option_name(r.get("option") or "") for r in reviews if _clean_option_name(r.get("option") or "")
+    )
     total = sum(opt_counts.values())
     option_reviews = []
     for name, c in opt_counts.most_common():
@@ -379,7 +416,20 @@ async def _crawl_smartstore_detail(detail: Page, url: str, entry: dict[str, Any]
         except Exception:
             reviews = []
     entry["reviews_json"] = reviews
-    entry["sales_json"] = _build_sales_info(captured.get("marketing"), prod, reviews)
+    # 주간 판매수: 인터셉트 실패 시 상품 ID로 직접 호출(원상품번호 → productNo → id 순)
+    marketing = captured.get("marketing")
+    if marketing is None:
+        for pid in (origin, prod.get("productNo"), prod.get("id")):
+            if not pid:
+                continue
+            try:
+                m = await detail.evaluate(JS_FETCH_MARKETING, [str(pid), len(reviews)])
+            except Exception:
+                m = None
+            if m and (m.get("mainPhrase") or "").strip():
+                marketing = m
+                break
+    entry["sales_json"] = _build_sales_info(marketing, prod, reviews)
     entry["raw_json"]["smartstore_notice"] = notice
     entry["raw_json"]["review_meta"] = {"merchant": merchant, "origin": origin, "fetched": len(reviews)}
     return True

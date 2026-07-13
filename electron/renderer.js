@@ -217,7 +217,7 @@ function renderProducts(products) {
           ? `<div class="sales__h">옵션별 구매 비율 <span>리뷰 ${sj.option_review_total || 0}건 기준</span></div>` : "";
         const opts = optRev.slice(0, 6).map((o) => {
           const pct = o.ratio != null ? Math.round(o.ratio * 100) : 0;
-          const est = o.est_weekly != null ? ` · 주간 ~${o.est_weekly}개` : "";
+          const est = o.est_weekly != null ? ` · ~${o.est_weekly}개 추정` : "";
           return `<div class="sales__opt">
             <span class="sales__opt-name" title="${esc(o.option)}">${esc(o.option)}</span>
             <span class="sales__bar"><i style="width:${pct}%"></i></span>
