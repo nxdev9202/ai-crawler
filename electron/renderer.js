@@ -206,6 +206,26 @@ function renderProducts(products) {
           <span class="senti__kw">${pk}${nk ? " · " + nk : ""}</span>
         </div>`;
       }
+      // 판매 인사이트(스마트스토어: 주간 판매량 + 옵션별 구매 비율)
+      const sj = p.sales_json || {};
+      const optRev = sj.option_reviews || [];
+      let salesHtml = "";
+      if (sj.weekly_sales_text || optRev.length) {
+        const weekly = sj.weekly_sales_text
+          ? `<div class="sales__weekly">📈 ${esc(sj.weekly_sales_text)}</div>` : "";
+        const head = optRev.length
+          ? `<div class="sales__h">옵션별 구매 비율 <span>리뷰 ${sj.option_review_total || 0}건 기준</span></div>` : "";
+        const opts = optRev.slice(0, 6).map((o) => {
+          const pct = o.ratio != null ? Math.round(o.ratio * 100) : 0;
+          const est = o.est_weekly != null ? ` · 주간 ~${o.est_weekly}개` : "";
+          return `<div class="sales__opt">
+            <span class="sales__opt-name" title="${esc(o.option)}">${esc(o.option)}</span>
+            <span class="sales__bar"><i style="width:${pct}%"></i></span>
+            <span class="sales__opt-v">${pct}% (${o.count})${est}</span>
+          </div>`;
+        }).join("");
+        salesHtml = `<div class="sales">${weekly}${head}${opts}</div>`;
+      }
       const media = p.image_url
         ? `<img src="${esc(p.image_url)}" onerror="this.parentNode.textContent='◳'"/>`
         : "◳";
@@ -222,6 +242,7 @@ function renderProducts(products) {
             p.price ? p.price.toLocaleString("ko-KR") + '<span>원</span>' : "가격 미확인"
           }</div>
           ${p.spec_text ? `<p class="pcard__spec">${esc(p.spec_text.slice(0, 320))}</p>` : ""}
+          ${salesHtml}
           ${sentiHtml}
           ${p.crawl_error ? `<div class="pcard__err">수집오류: ${esc(p.crawl_error)}</div>` : ""}
           <div class="disc">

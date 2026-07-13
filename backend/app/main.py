@@ -477,6 +477,7 @@ async def get_session(sid: int) -> dict[str, Any]:
                 "spec_text": p.spec_text,
                 "reviews_json": p.reviews_json,
                 "review_analysis": p.review_analysis,
+                "sales_json": getattr(p, "sales_json", {}) or {},
                 "rating": p.rating,
                 "review_count": p.review_count,
                 "crawl_error": p.crawl_error,
@@ -511,6 +512,7 @@ async def analyze(sid: int, req: AnalyzeReq) -> dict[str, Any]:
                 "review_count": p.review_count,
                 "spec_text": p.spec_text,
                 "review_analysis": p.review_analysis,
+                "sales_info": getattr(p, "sales_json", {}) or {},
             }
             for p in products
         ]

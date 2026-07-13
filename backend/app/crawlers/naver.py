@@ -163,7 +163,7 @@ async ([merchant, origin, target]) => {
     const c = j.contents || [];
     for (const it of c) {
       const t = (it.reviewContent || '').trim();
-      if (t) out.push({ score: it.reviewScore, content: t, date: (it.createDate || '').slice(0, 10) });
+      if (t) out.push({ score: it.reviewScore, content: t, date: (it.createDate || '').slice(0, 10), option: it.productOptionContent || '' });
     }
     if (j.last || c.length < 20 || page >= (j.totalPages || 1)) break;
     await new Promise((res) => setTimeout(res, 220));
@@ -201,7 +201,7 @@ async ([capUrl, target]) => {
     const revs = d.reviews || [];
     for (const it of revs) {
       const c = strip(it.content);
-      if (c) out.reviews.push({ score: it.starScore, content: c, date: (it.registerDate || '').slice(0, 10) });
+      if (c) out.reviews.push({ score: it.starScore, content: c, date: (it.registerDate || '').slice(0, 10), option: (it.buyOption || '').trim() });
     }
     if (revs.length < 20 || out.reviews.length >= target) break;
     await new Promise((res) => setTimeout(res, 220));
@@ -209,6 +209,56 @@ async ([capUrl, target]) => {
   return out;
 }
 """
+
+
+def _parse_weekly_sales(marketing: dict[str, Any] | None) -> tuple[str | None, int | None]:
+    """marketing-message 응답 → ('최근 1주간 N명 구매', N). 네이버 공식 노출 수치."""
+    if not marketing:
+        return None, None
+    prefix = marketing.get("prefix") or ""
+    phrase = marketing.get("mainPhrase") or ""
+    text = (prefix + phrase).strip() or None
+    m = re.search(r"([\d,]+)", phrase)
+    cnt = int(m.group(1).replace(",", "")) if m else None
+    return text, cnt
+
+
+def _combo_name(c: dict[str, Any]) -> str:
+    names = [c.get(f"optionName{i}") for i in range(1, 5)]
+    return " / ".join(str(n) for n in names if n)
+
+
+def _build_sales_info(
+    marketing: dict[str, Any] | None, prod: dict[str, Any] | None, reviews: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """판매 인사이트: 주간 판매량 + 구매옵션 분포(+옵션별 주간 추정) + 옵션 재고."""
+    from collections import Counter
+
+    text, cnt = _parse_weekly_sales(marketing)
+    opt_counts = Counter((r.get("option") or "").strip() for r in reviews if (r.get("option") or "").strip())
+    total = sum(opt_counts.values())
+    option_reviews = []
+    for name, c in opt_counts.most_common():
+        ratio = round(c / total, 3) if total else None
+        est = round(cnt * ratio) if (cnt is not None and ratio is not None) else None
+        option_reviews.append({"option": name, "count": c, "ratio": ratio, "est_weekly": est})
+    option_stock = []
+    for combo in ((prod or {}).get("optionCombinations") or []):
+        nm = _combo_name(combo)
+        if not nm:
+            continue
+        try:
+            stock = int(combo["stockQuantity"]) if combo.get("stockQuantity") is not None else None
+        except (TypeError, ValueError):
+            stock = None
+        option_stock.append({"name": nm, "stock": stock})
+    return {
+        "weekly_sales_text": text,
+        "weekly_sales_count": cnt,
+        "option_reviews": option_reviews,
+        "option_review_total": total,
+        "option_stock": option_stock,
+    }
 
 
 def _find_merchant(prod: dict[str, Any]) -> int | None:
@@ -222,14 +272,21 @@ def _find_merchant(prod: dict[str, Any]) -> int | None:
 
 async def _crawl_smartstore_detail(detail: Page, url: str, entry: dict[str, Any]) -> bool:
     """스마트스토어/브랜드스토어: 상품 API 가로채기 + 리뷰 API 직접 호출."""
-    captured: dict[str, Any] = {"product": None, "review_body": None, "catalog_review_url": None}
+    captured: dict[str, Any] = {
+        "product": None, "review_body": None, "catalog_review_url": None, "marketing": None,
+    }
 
     async def on_resp(resp) -> None:
         u = resp.url
         try:
             ct = resp.headers.get("content-type", "")
-            if "json" in ct and "/products/" in u and "/i/v" in u and "withWindow" in u:
+            if "json" not in ct:
+                return
+            if "/products/" in u and "/i/v" in u and "withWindow" in u:
                 captured["product"] = await resp.json()
+            # 판매량: 네이버가 노출하는 "최근 1주간 N명 구매"
+            elif "/marketing-message/" in u and captured["marketing"] is None:
+                captured["marketing"] = await resp.json()
         except Exception:
             pass
 
@@ -270,6 +327,8 @@ async def _crawl_smartstore_detail(detail: Page, url: str, entry: dict[str, Any]
             except Exception:
                 r = {"reviews": [], "total": None}
             entry["reviews_json"] = r.get("reviews") or []
+            # 가격비교는 주간 판매량 노출이 없어 옵션 분포만(구매옵션 기반)
+            entry["sales_json"] = _build_sales_info(None, None, entry["reviews_json"])
             if r.get("total") is not None:
                 entry["review_count"] = str(r["total"])
             entry["raw_json"]["catalog_review"] = {
@@ -320,6 +379,7 @@ async def _crawl_smartstore_detail(detail: Page, url: str, entry: dict[str, Any]
         except Exception:
             reviews = []
     entry["reviews_json"] = reviews
+    entry["sales_json"] = _build_sales_info(captured.get("marketing"), prod, reviews)
     entry["raw_json"]["smartstore_notice"] = notice
     entry["raw_json"]["review_meta"] = {"merchant": merchant, "origin": origin, "fetched": len(reviews)}
     return True
@@ -459,6 +519,7 @@ async def crawl(
                 "spec_json": {},
                 "spec_text": None,
                 "reviews_json": [],
+                "sales_json": {},
                 "rating": None,
                 "review_count": None,
                 "raw_json": {"list_item": it},

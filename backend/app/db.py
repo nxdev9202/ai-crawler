@@ -73,6 +73,8 @@ class Product(Base):
     reviews_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=list)
     # NLP 전처리 결과: 긍/부정 분포 + 핵심 키워드 + 대표 샘플
     review_analysis: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # 판매 인사이트(스마트스토어): 주간 판매량 + 옵션별 분포/재고
+    sales_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     rating: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     review_count: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
 
@@ -104,3 +106,13 @@ class Analysis(Base):
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # 기존 DB에 새 컬럼 추가(SQLite는 create_all이 기존 테이블을 변경하지 않음)
+        from sqlalchemy import text
+
+        for stmt in (
+            "ALTER TABLE products ADD COLUMN sales_json JSON DEFAULT '{}'",
+        ):
+            try:
+                await conn.exec_driver_sql(stmt)
+            except Exception:
+                pass  # 이미 있으면 무시

@@ -203,6 +203,16 @@
       .senti__kw { font-size: 11.5px; color: var(--text-faint); }
       .senti__kw b { color: var(--good); font-weight: 600; }
       .senti__kw em { color: var(--danger); font-style: normal; font-weight: 600; }
+      /* 판매 인사이트(스마트스토어) */
+      .sales { margin-top: 10px; padding: 11px 13px; background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 7px; }
+      .sales__weekly { font-weight: 700; font-size: 13px; color: var(--accent); }
+      .sales__h { font-size: 11.5px; color: var(--text-dim); font-weight: 600; }
+      .sales__h span { color: var(--text-faint); font-weight: 400; margin-left: 4px; }
+      .sales__opt { display: grid; grid-template-columns: minmax(64px, 130px) 1fr auto; align-items: center; gap: 8px; font-size: 12px; }
+      .sales__opt-name { color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .sales__bar { height: 7px; background: var(--panel); border-radius: 20px; overflow: hidden; }
+      .sales__bar i { display: block; height: 100%; background: var(--accent); }
+      .sales__opt-v { color: var(--text-faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
       .disc { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
       details > summary { cursor: pointer; color: var(--text-faint); font-size: 11.5px; list-style: none; display: inline-flex; align-items: center; gap: 4px; }
       details > summary::-webkit-details-marker { display: none; }
